@@ -1,0 +1,7 @@
+# Used only in github.com/nomideusz/svelte-geometrize (not the asini monorepo).
+# pnpm 10+ blocks lifecycle scripts until approved; esbuild needs its postinstall.
+packages:
+  - '.'
+allowBuilds:
+  esbuild: true
+  sharp: true
