@@ -2,6 +2,8 @@
 
 Geometric image placeholders for Svelte 5 — instead of a blur, triangles resolve into the photo while it loads, [geometrize.co.uk](https://www.geometrize.co.uk/)-style.
 
+**[Live demo → svelte-geometrize.vercel.app](https://svelte-geometrize.vercel.app/)**
+
 The expensive shape fitting (hill-climbing, via [geometrizejs](https://www.npmjs.com/package/geometrizejs)) runs **at build time** and emits a small ordered shape list (~1–10 KB raw, far less gzipped). Because geometrize is iterative — shape 1 is the dominant region, shape 100 is fine detail — replaying the shapes in fit order makes the placeholder visibly *sharpen* until the real image crossfades in. The runtime component is tiny and dependency-free.
 
 ## Usage
@@ -36,6 +38,12 @@ declare module '*?geometrize' {
 	const placeholder: import('@nomideusz/svelte-geometrize').GeometrizePlaceholder;
 	export default placeholder;
 }
+
+// when combining with query params, put `geometrize` last (see below)
+declare module '*&geometrize' {
+	const placeholder: import('@nomideusz/svelte-geometrize').GeometrizePlaceholder;
+	export default placeholder;
+}
 ```
 
 ## Options
@@ -43,8 +51,10 @@ declare module '*?geometrize' {
 Plugin-wide defaults via `geometrize({ ... })`, per-image overrides via query params:
 
 ```
-./photo.jpg?geometrize&shapes=150&alpha=160&maxSize=160&shapeTypes=triangle,ellipse
+./photo.jpg?shapes=150&alpha=160&maxSize=160&shapeTypes=triangle,ellipse&geometrize
 ```
+
+Param order doesn't matter to the plugin, but keeping `geometrize` last lets the `*&geometrize` module declaration above type these imports.
 
 | Option | Default | Meaning |
 | --- | --- | --- |
