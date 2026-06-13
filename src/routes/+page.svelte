@@ -85,7 +85,7 @@ import src from './photo.jpg';
 			<button class="replay" onclick={() => run++}>↻ replay</button>
 			<label>
 				photo arrives in
-				<select bind:value={delayMs}>
+				<select bind:value={delayMs} onchange={() => run++}>
 					<option value={1000}>1s</option>
 					<option value={2500}>2.5s</option>
 					<option value={5000}>5s</option>

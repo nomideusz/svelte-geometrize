@@ -30,9 +30,11 @@
 	let img: HTMLImageElement | undefined = $state();
 	let loaded = $state(false);
 
-	// onload never fires for images that completed before hydration (e.g. cached)
+	// Re-evaluates on every src change: resets to hidden for a new (or empty) src,
+	// and catches images that completed before hydration or onload binding (e.g. cached).
 	$effect(() => {
-		if (img?.complete && img.naturalWidth > 0) loaded = true;
+		void src;
+		loaded = Boolean(src && img?.complete && img.naturalWidth > 0);
 	});
 
 	// Built as one string (not Svelte-templated shapes) so the fragments live in a
@@ -51,16 +53,20 @@
 	style:--geometrize-shape-ms="{shapeDuration}ms"
 >
 	{@html svgMarkup}
-	<img
-		bind:this={img}
-		{...rest}
-		{src}
-		{alt}
-		class:loaded
-		style:transition-duration="{fadeDuration}ms"
-		decoding="async"
-		onload={() => (loaded = true)}
-	/>
+	{#if src}
+		<!-- on error the img stays transparent, so the placeholder persists
+		     instead of the browser's broken-image icon and alt text -->
+		<img
+			bind:this={img}
+			{...rest}
+			{src}
+			{alt}
+			class:loaded
+			style:transition-duration="{fadeDuration}ms"
+			decoding="async"
+			onload={() => (loaded = true)}
+		/>
+	{/if}
 </div>
 
 <style>
