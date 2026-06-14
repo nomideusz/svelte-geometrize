@@ -65,7 +65,9 @@ Param order doesn't matter to the plugin, but keeping `geometrize` last lets the
 | `candidateShapesPerStep` | `50` | Fit quality vs. build speed |
 | `shapeMutationsPerStep` | `100` | Fit quality vs. build speed |
 
-Component props beyond `placeholder` / `src` / `alt`: `stagger` (ms between shapes, default 15), `shapeDuration` (per-shape fade, default 400), `fadeDuration` (crossfade to the real image, default 350). All other props are forwarded to the `<img>`. The reveal is pure CSS animation, so it plays with SSR before hydration and respects `prefers-reduced-motion`.
+Component props beyond `placeholder` / `src` / `alt`: `stagger` (ms between shapes, default 15), `shapeDuration` (per-shape fade, default 400), `fadeDuration` (crossfade to the real image, default 600), `revealBlur` (px the placeholder softens to during the handoff, default 8 — set `0` for a hard-edged crossfade). All other props are forwarded to the `<img>`. The reveal is pure CSS animation, so it plays with SSR before hydration and respects `prefers-reduced-motion`.
+
+Shapes are revealed coarse-first and decelerate into the fine detail. When the photo arrives it fades in on top while the placeholder eases back and softens (`revealBlur`), so the sharp image resolves *into focus* instead of two crisp-but-different pictures swapping — the placeholder itself stays crisp the whole time it's the loading state; the blur only happens during the sub-second handoff. The reveal runs on its own clock, so to keep it flowing right up to when the photo arrives, pace it to your expected load time with `stagger` / `shapeDuration` (a longer reveal leaves less of a gap before the crossfade on slow connections).
 
 ## Node API
 
