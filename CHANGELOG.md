@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.1 — 2026-06-17
+
+### Changed
+- Add `homepage` field pointing to the live demo (now shown as Homepage on npm).
+
 ## 0.2.0
 
 - Smoother placeholder → photo transition: the shape reveal now decelerates (coarse shapes land fast, fine detail trickles in) instead of stopping abruptly, and during the handoff the placeholder eases back and softens while the real image fades in on top — so the photo resolves *into focus* instead of two sharp-but-different pictures swapping. The placeholder stays crisp the whole time it's the loading state; the blur applies only during the sub-second crossfade and is tunable via the new `revealBlur` prop (px, default 8; `0` restores a hard-edged crossfade). The bitmap is decoded before the crossfade starts so the first frame is paint-ready. `fadeDuration` default raised 350 → 600ms; `prefers-reduced-motion` still gets an instant swap.
