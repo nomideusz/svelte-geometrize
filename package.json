@@ -47,6 +47,7 @@
     "sharp": "^0.34.5"
   },
   "devDependencies": {
+    "@types/node": "^25.0.0",
     "@sveltejs/adapter-auto": "^7.0.0",
     "@sveltejs/kit": "^2.50.2",
     "@sveltejs/package": "^2.5.7",
@@ -71,5 +72,6 @@
   "repository": {
     "type": "git",
     "url": "https://github.com/nomideusz/svelte-geometrize"
-  }
+  },
+  "homepage": "https://svelte-geometrize.vercel.app/"
 }
