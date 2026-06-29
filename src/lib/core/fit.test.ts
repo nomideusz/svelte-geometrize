@@ -43,6 +43,21 @@ describe('fitShapes', () => {
 		expect(placeholder.bg).toBe('rgb(200,100,50)');
 	});
 
+	it('ignores transparent pixels when averaging the background', () => {
+		// Half opaque red-ish, half fully transparent (0,0,0,0). A naive mean would
+		// halve the channels toward black; alpha weighting must yield the opaque color.
+		const data = new Uint8Array(16 * 16 * 4);
+		for (let i = 0; i < data.length; i += 4) {
+			const opaque = i < data.length / 2;
+			data[i] = 200;
+			data[i + 1] = 100;
+			data[i + 2] = 50;
+			data[i + 3] = opaque ? 255 : 0;
+		}
+		const placeholder = fitShapes(data, 16, 16, 16, 16, { shapes: 1 });
+		expect(placeholder.bg).toBe('rgb(200,100,50)');
+	});
+
 	it('supports other shape types', () => {
 		const placeholder = fitShapes(gradientRgba(24, 24), 24, 24, 24, 24, {
 			shapes: 4,

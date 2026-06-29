@@ -19,7 +19,7 @@
 		 * Masks the detail gap between the coarse shapes and the real image so the
 		 * photo resolves *into focus* instead of two sharp images swapping. The
 		 * resting placeholder stays crisp — this only applies during the crossfade.
-		 * Set 0 for a hard-edged crossfade. Default 8.
+		 * Set 0 for a hard-edged crossfade. Default 12.
 		 */
 		revealBlur?: number;
 	}
@@ -32,7 +32,7 @@
 		stagger = 15,
 		shapeDuration = 400,
 		fadeDuration = 600,
-		revealBlur = 8,
+		revealBlur = 12,
 		...rest
 	}: Props = $props();
 
@@ -147,6 +147,15 @@
 		transform: scale(1.04);
 	}
 
+	/* The moment the photo is ready, snap any still-pending shapes to fully visible.
+	   Otherwise their long ease-in delays keep trickling detail in *underneath* the
+	   crossfade — which reads as "the reveal slows down, then the photo replaces it"
+	   instead of one continuous handoff. Killing the animation drops each <g> to its
+	   base opacity (1), so the placeholder is a stable whole image to resolve out of. */
+	.geometrize.is-loaded :global(svg g) {
+		animation: none;
+	}
+
 	.geometrize :global(svg g) {
 		animation: geometrize-shape-in var(--geometrize-shape-ms, 400ms) ease-out both;
 		/* inline animation-delay on each <g> survives this shorthand (inline wins) */
@@ -168,19 +177,23 @@
 		height: 100%;
 		object-fit: cover;
 		opacity: 0;
-		/* starts a hair oversized and settles to 1:1 — pairs with the placeholder's
-		   blur-back so the photo reads as coming into focus, not cutting in */
+		/* starts soft + a hair oversized and resolves to sharp 1:1 — the photo itself
+		   pulls into focus as the blurred placeholder pushes out under it, so the two
+		   meet in the same soft register instead of a sharp image cutting over a blur */
+		filter: blur(var(--geometrize-reveal-blur, 8px));
 		transform: scale(1.03);
 		transform-origin: center;
-		transition-property: opacity, transform;
+		transition-property: opacity, transform, filter;
 		transition-duration: var(--geometrize-fade-ms, 600ms);
-		/* steady dissolve for opacity, gentle decelerating settle for the scale */
-		transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1), cubic-bezier(0.22, 1, 0.36, 1);
-		will-change: opacity, transform;
+		/* steady dissolve for opacity, gentle decelerating settle for scale + focus */
+		transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1), cubic-bezier(0.22, 1, 0.36, 1),
+			cubic-bezier(0.22, 1, 0.36, 1);
+		will-change: opacity, transform, filter;
 	}
 
 	img.loaded {
 		opacity: 1;
+		filter: blur(0);
 		transform: scale(1);
 	}
 
@@ -197,6 +210,7 @@
 		}
 		img {
 			transition-duration: 0ms !important;
+			filter: none !important;
 			transform: none !important;
 		}
 	}

@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.3.1 — 2026-06-29
+
+### Security
+- Bump vulnerable devDependencies to clear npm High CVE alerts: `vite` ^7.3.1 → ^7.3.5, `vitest` ^4.0.18 → ^4.1.0, `@sveltejs/kit` ^2.50.2 → ^2.60.1. No runtime deps affected.
+
+## 0.3.0 — 2026-06-26
+
+### Changed
+- More natural placeholder → photo handoff. The moment the photo is ready, any still-pending shapes snap to fully visible instead of trickling in *under* the crossfade — previously the long ease-in tail kept revealing detail during the swap, which read as "the reveal slows down, then the photo replaces it." The photo now also emerges from blur (resolving *into focus*) rather than fading in already sharp over a blurred placeholder.
+- `revealBlur` default raised 8 → 12px for a stronger focus-pull during the handoff.
+
+### Fixed
+- Background color (`bg`) is now alpha-weighted, so fully transparent pixels no longer drag the average toward black. Transparent PNGs / logos / cutouts now get the correct opaque background instead of a dark one. (Changes generated placeholder output for images with transparency.)
+
 ## 0.2.1 — 2026-06-17
 
 ### Changed

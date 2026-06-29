@@ -90,15 +90,20 @@ function compactFragment(fragment: string): string {
 	return fragment.replace(/(\d+\.\d{3})\d+/g, '$1').replace(/(\.\d*?)0+(?=")/g, '$1');
 }
 
+// Alpha-weighted so fully transparent pixels (RGB usually 0,0,0 after ensureAlpha)
+// don't drag the background toward black on cutouts/logos.
 function averageColor(rgba: Uint8Array | Uint8ClampedArray): string {
 	let r = 0;
 	let g = 0;
 	let b = 0;
-	const pixels = rgba.length / 4;
+	let a = 0;
 	for (let i = 0; i < rgba.length; i += 4) {
-		r += rgba[i];
-		g += rgba[i + 1];
-		b += rgba[i + 2];
+		const w = rgba[i + 3];
+		r += rgba[i] * w;
+		g += rgba[i + 1] * w;
+		b += rgba[i + 2] * w;
+		a += w;
 	}
-	return `rgb(${Math.round(r / pixels)},${Math.round(g / pixels)},${Math.round(b / pixels)})`;
+	if (a === 0) return 'rgb(0,0,0)';
+	return `rgb(${Math.round(r / a)},${Math.round(g / a)},${Math.round(b / a)})`;
 }
