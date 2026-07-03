@@ -12,16 +12,8 @@
 		stagger?: number;
 		/** Fade-in duration of each individual shape, in ms. Default 400. */
 		shapeDuration?: number;
-		/** Crossfade duration once the real image has loaded, in ms. Default 600. */
+		/** Crossfade duration of the photo once loaded, in ms. Default 600. */
 		fadeDuration?: number;
-		/**
-		 * Blur the placeholder softens to as it hands off to the photo, in px.
-		 * Masks the detail gap between the coarse shapes and the real image so the
-		 * photo resolves *into focus* instead of two sharp images swapping. The
-		 * resting placeholder stays crisp — this only applies during the crossfade.
-		 * Set 0 for a hard-edged crossfade. Default 12.
-		 */
-		revealBlur?: number;
 	}
 
 	let {
@@ -32,7 +24,6 @@
 		stagger = 15,
 		shapeDuration = 400,
 		fadeDuration = 600,
-		revealBlur = 12,
 		...rest
 	}: Props = $props();
 
@@ -95,11 +86,9 @@
 
 <div
 	class="geometrize {className}"
-	class:is-loaded={loaded}
 	style:aspect-ratio="{placeholder.w} / {placeholder.h}"
 	style:--geometrize-shape-ms="{shapeDuration}ms"
 	style:--geometrize-fade-ms="{fadeDuration}ms"
-	style:--geometrize-reveal-blur="{revealBlur}px"
 >
 	{@html svgMarkup}
 	{#if src}
@@ -125,35 +114,16 @@
 		overflow: hidden;
 	}
 
+	/* The placeholder never moves or blurs — it's the viewer's anchor. Any pending
+	   shapes just keep trickling in during the handoff: under the dissolving photo
+	   they're barely visible, and the continued motion smooths a fast (cached) load
+	   instead of snapping to a finished placeholder. */
 	.geometrize :global(svg) {
 		position: absolute;
 		inset: 0;
 		width: 100%;
 		height: 100%;
 		display: block;
-		transform-origin: center;
-		/* stays crisp while it's the loading state; softens only during the handoff */
-		transition-property: filter, transform;
-		transition-duration: var(--geometrize-fade-ms, 600ms);
-		transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-	}
-
-	/* As the photo fades in on top, the placeholder blurs and eases back a touch, so
-	   the sharp image resolves out of softness (a focus-pull) rather than dissolving
-	   against competing sharp shapes. It stays fully opaque underneath — no muddy gap.
-	   Scaling slightly past the clip keeps the blurred edge from feathering inward. */
-	.geometrize.is-loaded :global(svg) {
-		filter: blur(var(--geometrize-reveal-blur, 8px));
-		transform: scale(1.04);
-	}
-
-	/* The moment the photo is ready, snap any still-pending shapes to fully visible.
-	   Otherwise their long ease-in delays keep trickling detail in *underneath* the
-	   crossfade — which reads as "the reveal slows down, then the photo replaces it"
-	   instead of one continuous handoff. Killing the animation drops each <g> to its
-	   base opacity (1), so the placeholder is a stable whole image to resolve out of. */
-	.geometrize.is-loaded :global(svg g) {
-		animation: none;
 	}
 
 	.geometrize :global(svg g) {
@@ -177,41 +147,25 @@
 		height: 100%;
 		object-fit: cover;
 		opacity: 0;
-		/* starts soft + a hair oversized and resolves to sharp 1:1 — the photo itself
-		   pulls into focus as the blurred placeholder pushes out under it, so the two
-		   meet in the same soft register instead of a sharp image cutting over a blur */
-		filter: blur(var(--geometrize-reveal-blur, 8px));
-		transform: scale(1.03);
-		transform-origin: center;
-		transition-property: opacity, transform, filter;
-		transition-duration: var(--geometrize-fade-ms, 600ms);
-		/* steady dissolve for opacity, gentle decelerating settle for scale + focus */
-		transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1), cubic-bezier(0.22, 1, 0.36, 1),
-			cubic-bezier(0.22, 1, 0.36, 1);
-		will-change: opacity, transform, filter;
+		/* A plain dissolve — no blur, no scale, and the placeholder never moves.
+		   The shapes are fitted to this exact photo, so the sharp photo fading in
+		   reads as the final refinement step (fine detail arriving over the same
+		   structure), not as two different images swapping. Blur was tried here and
+		   read as the crisp geometry suddenly going soft. */
+		transition: opacity var(--geometrize-fade-ms, 600ms) cubic-bezier(0.4, 0, 0.2, 1);
+		will-change: opacity;
 	}
 
 	img.loaded {
 		opacity: 1;
-		filter: blur(0);
-		transform: scale(1);
 	}
 
 	@media (prefers-reduced-motion: reduce) {
 		.geometrize :global(svg g) {
 			animation: none;
 		}
-		.geometrize :global(svg) {
-			transition: none !important;
-		}
-		.geometrize.is-loaded :global(svg) {
-			filter: none !important;
-			transform: none !important;
-		}
 		img {
 			transition-duration: 0ms !important;
-			filter: none !important;
-			transform: none !important;
 		}
 	}
 </style>

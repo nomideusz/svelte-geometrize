@@ -29,11 +29,13 @@ import src from './photo.jpg';
 
 	const MAX_SIZE = 128; // longest edge the fitter works in — keeps it fast at any upload size
 	// Reveal pacing: spread all the shapes across ~SHAPE_REVEAL_MS regardless of how many
-	// there are, then hand off to the photo a beat after they land — so changing the shape
-	// count never cuts the build-up short or jumps to the photo early.
+	// there are, then start the photo dissolve while fine detail is still trickling in.
+	// The reveal decelerates, so waiting for the true end (let alone adding a pause)
+	// leaves a beat of dead stillness before the fade — overlapping the tail keeps the
+	// motion continuous, exactly like a real photo arriving mid-reveal.
 	const SHAPE_REVEAL_MS = 850; // target time for the staggered shapes to finish appearing
 	const SHAPE_DURATION = 400; // per-shape fade (matches what we pass to the component)
-	const HANDOFF_PAUSE = 250; // beat between the last shape and the photo crossfade
+	const HANDOFF_AT = 0.65; // fraction of the reveal after which the photo starts dissolving
 
 	// ── Image source ────────────────────────────────────
 	let mode = $state<'sample' | 'upload'>('sample');
@@ -229,7 +231,7 @@ import src from './photo.jpg';
 		// read untracked: this should re-fire only on replay/refit (run), not when the
 		// derived timing values change on their own
 		const url = untrack(() => imageSrc);
-		const delay = untrack(() => revealEndMs) + HANDOFF_PAUSE;
+		const delay = Math.round(untrack(() => revealEndMs) * HANDOFF_AT);
 		const t = setTimeout(() => (revealSrc = url), delay);
 		return () => clearTimeout(t);
 	});
@@ -315,6 +317,10 @@ import src from './photo.jpg';
 			<code>{INSTALL}</code>
 			<span class="copy">{copied ? 'copied ✓' : 'copy'}</span>
 		</button>
+		<p class="hero-prod">
+			In production on <a href="https://szkolyjogi.pl" target="_blank" rel="noopener">szkolyjogi.pl</a>
+			— 700+ listing photos resolve from their geometric preview.
+		</p>
 	</section>
 
 	<!-- ═══ Playground ═════════════════════════════════════ -->
@@ -546,6 +552,18 @@ import src from './photo.jpg';
 		color: var(--text-3);
 		padding-left: 10px;
 		border-left: 1px solid var(--border);
+	}
+	.hero-prod {
+		font: 400 12.5px/1.5 'Outfit', system-ui, sans-serif;
+		color: var(--text-3);
+		margin: 14px 0 0;
+	}
+	.hero-prod a {
+		color: var(--accent);
+		border-bottom: 1px solid var(--accent-glow);
+	}
+	.hero-prod a:hover {
+		border-bottom-color: var(--accent);
 	}
 	@media (max-width: 600px) {
 		.hero {

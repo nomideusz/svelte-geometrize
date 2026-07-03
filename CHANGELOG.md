@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.4.1 — 2026-07-02
+
+### Docs
+- README: link the production deployment ([szkolyjogi.pl](https://szkolyjogi.pl), 700+ listing heroes) and add a "Dynamic images" section documenting the runtime pattern — generate placeholders at ingest with the Node API, store the JSON in the DB, pass it to the component. No code changes.
+
+## 0.4.0 — 2026-07-02
+
+### Changed
+- The photo handoff is now a plain dissolve: the placeholder never moves, blurs, or scales, and the sharp photo simply fades in on top. Measured frame-by-frame, the old crossfade moved both layers at once — the incoming photo lost most of its blur while still ~40% transparent, while the placeholder blurred out underneath it, so mid-fade the viewer saw a half-sharp ghost photo over mush, then the photo popped opaque: the perceived "jump". Blur-based fixes (soft dissolve, then focus-pull) were tried and rejected — any blur reads as the crisp geometry suddenly going soft, and the blur collapse reads as a zoom. Since the shapes are fitted to the exact photo, the plain dissolve reads as the final refinement step: fine detail arriving over the same structure.
+- **Removed the `revealBlur` prop** along with all blur in the handoff. If you passed it, drop it (it would now be forwarded to the `<img>` as an unknown attribute).
+- Pending shapes no longer snap to fully visible when the photo arrives — they keep trickling in under the dissolve (barely visible there), so a fast/cached load stays in motion instead of popping to a finished placeholder first.
+- Removed the internal `is-loaded` class from the wrapper; the loaded state lives on the `<img>` only.
+
 ## 0.3.1 — 2026-06-29
 
 ### Security
