@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.5.1 — 2026-07-07
+
+### Fixed
+- Shipped `.svelte` files are now transpiled to plain JavaScript (`vitePreprocess({ script: true })` at package time), so toolchains without a TypeScript preprocessor — `svelte-loader`, bundlephobia, plain rollup — can compile the package. No change for Vite/SvelteKit consumers.
+
 ## 0.5.0 — 2026-07-06
 
 ### Added
