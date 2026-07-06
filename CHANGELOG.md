@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.5.0 — 2026-07-06
+
+### Added
+- **`reveal` prop** on `GeometrizedImage`: `'fade'` (default, unchanged), `'pop'` (each shape scales in from 0.5), or `'scatter'` (each shape flies in from a deterministic per-shape direction — golden-angle by index, so SSR and client markup always match). All variants are pure CSS: they play before hydration and are disabled by `prefers-reduced-motion`. Exported `GeometrizeReveal` type.
+- Demo: Fade / Pop / Scatter toggle in the playground.
+
+### Docs
+- README/demo: kurcz.pl joins szkolyjogi.pl as a production deployment.
+
 ## 0.4.1 — 2026-07-02
 
 ### Docs

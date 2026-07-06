@@ -2,7 +2,7 @@
 
 Geometric image placeholders for Svelte 5 — instead of a blur, triangles resolve into the photo while it loads, [geometrize.co.uk](https://www.geometrize.co.uk/)-style.
 
-**[Live demo → svelte-geometrize.vercel.app](https://svelte-geometrize.vercel.app/)** · In production on [szkolyjogi.pl](https://szkolyjogi.pl), where 700+ listing heroes paint an instant geometric preview of the photo while it loads (open any school page, e.g. [this one](https://szkolyjogi.pl/krakow/szkola-jogi-na-debnikach-w-krakowie) — hard-refresh to replay).
+**[Live demo → svelte-geometrize.vercel.app](https://svelte-geometrize.vercel.app/)** · In production on [szkolyjogi.pl](https://szkolyjogi.pl), where 700+ listing heroes paint an instant geometric preview of the photo while it loads (open any school page, e.g. [this one](https://szkolyjogi.pl/krakow/szkola-jogi-na-debnikach-w-krakowie) — hard-refresh to replay), and on [kurcz.pl](https://kurcz.pl).
 
 The expensive shape fitting (hill-climbing, via [geometrizejs](https://www.npmjs.com/package/geometrizejs)) runs **at build time** and emits a small ordered shape list (~1–10 KB raw, far less gzipped). Because geometrize is iterative — shape 1 is the dominant region, shape 100 is fine detail — replaying the shapes in fit order makes the placeholder visibly *sharpen* until the real image crossfades in. The runtime component is tiny and dependency-free.
 
@@ -65,7 +65,7 @@ Param order doesn't matter to the plugin, but keeping `geometrize` last lets the
 | `candidateShapesPerStep` | `50` | Fit quality vs. build speed |
 | `shapeMutationsPerStep` | `100` | Fit quality vs. build speed |
 
-Component props beyond `placeholder` / `src` / `alt`: `stagger` (ms between shapes, default 15), `shapeDuration` (per-shape fade, default 400), `fadeDuration` (crossfade to the real image, default 600). All other props are forwarded to the `<img>`. The reveal is pure CSS animation, so it plays with SSR before hydration and respects `prefers-reduced-motion`.
+Component props beyond `placeholder` / `src` / `alt`: `reveal` (`'fade' | 'pop' | 'scatter'`, default `'fade'` — shapes fade in, scale in, or fly in from a per-shape direction), `stagger` (ms between shapes, default 15), `shapeDuration` (per-shape fade, default 400), `fadeDuration` (crossfade to the real image, default 600). All other props are forwarded to the `<img>`. The reveal is pure CSS animation, so it plays with SSR before hydration and respects `prefers-reduced-motion`.
 
 Shapes are revealed coarse-first and decelerate into the fine detail, and the photo hands off with a plain dissolve on top — the placeholder never moves, blurs, or scales. Because the shapes are fitted to that exact photo, the fade reads as the final refinement step (fine detail arriving over the same structure), not as two different images swapping. The reveal runs on its own clock, so to keep it flowing right up to when the photo arrives, pace it to your expected load time with `stagger` / `shapeDuration` (a longer reveal leaves less of a gap before the handoff on slow connections).
 

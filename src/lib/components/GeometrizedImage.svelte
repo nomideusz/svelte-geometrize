@@ -9,6 +9,8 @@
 		sizes?: string;
 	}
 
+	export type GeometrizeReveal = 'fade' | 'pop' | 'scatter';
+
 	interface Props extends Omit<HTMLImgAttributes, 'src' | 'alt' | 'class' | 'placeholder'> {
 		placeholder: GeometrizePlaceholder;
 		src?: string;
@@ -17,6 +19,8 @@
 		alt: string;
 		/** Class applied to the wrapper element. */
 		class?: string;
+		/** How each shape animates in: plain fade, scale-in pop, or fly-in scatter. Default 'fade'. */
+		reveal?: GeometrizeReveal;
 		/** Delay between consecutive shapes appearing, in ms. Default 15. */
 		stagger?: number;
 		/** Fade-in duration of each individual shape, in ms. Default 400. */
@@ -32,6 +36,7 @@
 		sources = [],
 		alt,
 		class: className = '',
+		reveal: revealKind = 'fade',
 		stagger = 15,
 		shapeDuration = 400,
 		fadeDuration = 600,
@@ -70,13 +75,20 @@
 
 	const svgMarkup = $derived.by(() => {
 		const last = Math.max(placeholder.s.length - 1, 1);
+		const dist = placeholder.fw * 0.1; // scatter fly-in distance, in viewBox units
 		return (
 			`<svg viewBox="0 0 ${placeholder.fw} ${placeholder.fh}" preserveAspectRatio="xMidYMid slice" aria-hidden="true">` +
 			`<rect width="${placeholder.fw}" height="${placeholder.fh}" fill="${placeholder.bg}"/>` +
 			placeholder.s
 				.map((frag, i) => {
 					const delay = Math.round((i / last) ** 1.6 * last * stagger);
-					return `<g style="animation-delay:${delay}ms">${frag}</g>`;
+					let style = `animation-delay:${delay}ms`;
+					if (revealKind === 'scatter') {
+						// deterministic pseudo-random direction per shape (golden angle)
+						const a = (i * 2.39996) % (Math.PI * 2);
+						style += `;--gdx:${(Math.cos(a) * dist).toFixed(1)}px;--gdy:${(Math.sin(a) * dist).toFixed(1)}px`;
+					}
+					return `<g style="${style}">${frag}</g>`;
 				})
 				.join('') +
 			`</svg>`
@@ -85,7 +97,7 @@
 </script>
 
 <div
-	class="geometrize {className}"
+	class="geometrize reveal-{revealKind} {className}"
 	style:aspect-ratio="{placeholder.w} / {placeholder.h}"
 	style:--geometrize-shape-ms="{shapeDuration}ms"
 	style:--geometrize-fade-ms="{fadeDuration}ms"
@@ -145,7 +157,15 @@
 	}
 
 	.geometrize :global(svg g) {
+		transform-box: fill-box; /* scale/translate around each shape's own center, not the SVG origin */
+		transform-origin: center;
 		animation: geometrize-shape-in var(--geometrize-shape-ms, 400ms) ease-out both;
+	}
+	.reveal-pop :global(svg g) {
+		animation-name: geometrize-shape-pop;
+	}
+	.reveal-scatter :global(svg g) {
+		animation-name: geometrize-shape-scatter;
 	}
 
 	@keyframes -global-geometrize-shape-in {
@@ -154,6 +174,28 @@
 		}
 		to {
 			opacity: 1;
+		}
+	}
+
+	@keyframes -global-geometrize-shape-pop {
+		from {
+			opacity: 0;
+			transform: scale(0.5);
+		}
+		to {
+			opacity: 1;
+			transform: none;
+		}
+	}
+
+	@keyframes -global-geometrize-shape-scatter {
+		from {
+			opacity: 0;
+			transform: translate(var(--gdx, 0), var(--gdy, 0)) scale(0.7);
+		}
+		to {
+			opacity: 1;
+			transform: none;
 		}
 	}
 

@@ -1,7 +1,12 @@
 <script lang="ts">
 	import { onMount, untrack } from 'svelte';
 	import { GeometrizedImage } from '$lib/index.js';
-	import type { ShapeKind, GeometrizeOptions, GeometrizePlaceholder } from '$lib/index.js';
+	import type {
+		ShapeKind,
+		GeometrizeOptions,
+		GeometrizePlaceholder,
+		GeometrizeReveal
+	} from '$lib/index.js';
 	import FitWorker from './fit.worker.ts?worker';
 
 	// Build-time placeholder for the first paint — the real product. Matches the
@@ -52,6 +57,14 @@ import src from './photo.jpg';
 	let selectedTypes = $state<ShapeKind[]>(['triangle']);
 	let shapeCount = $state(100);
 	let alpha = $state(128);
+
+	// ── Reveal variant ──────────────────────────────────
+	const REVEALS: { key: GeometrizeReveal; label: string }[] = [
+		{ key: 'fade', label: 'Fade' },
+		{ key: 'pop', label: 'Pop' },
+		{ key: 'scatter', label: 'Scatter' }
+	];
+	let revealKind = $state<GeometrizeReveal>('fade');
 
 	// ── Result + reveal state ───────────────────────────
 	let placeholder = $state<GeometrizePlaceholder>(initialPlaceholder);
@@ -319,7 +332,8 @@ import src from './photo.jpg';
 		</button>
 		<p class="hero-prod">
 			In production on <a href="https://szkolyjogi.pl" target="_blank" rel="noopener">szkolyjogi.pl</a>
-			— 700+ listing photos resolve from their geometric preview.
+			— 700+ listing photos resolve from their geometric preview — and
+			<a href="https://kurcz.pl" target="_blank" rel="noopener">kurcz.pl</a>.
 		</p>
 	</section>
 
@@ -337,6 +351,7 @@ import src from './photo.jpg';
 						<GeometrizedImage
 							{placeholder}
 							src={revealSrc}
+							reveal={revealKind}
 							stagger={revealStagger}
 							shapeDuration={SHAPE_DURATION}
 							alt="Geometrized preview"
@@ -419,6 +434,25 @@ import src from './photo.jpg';
 							</button>
 						{/each}
 					</div>
+				</div>
+
+				<div class="control">
+					<span class="control-label">Reveal</span>
+					<div class="seg">
+						{#each REVEALS as r}
+							<button
+								class="seg-btn"
+								class:seg-btn--on={revealKind === r.key}
+								onclick={() => {
+									revealKind = r.key;
+									playReveal();
+								}}
+							>
+								{r.label}
+							</button>
+						{/each}
+					</div>
+					<span class="control-hint">how each shape animates in — replays on change</span>
 				</div>
 
 				<div class="control">
