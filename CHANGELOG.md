@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.5.2 — 2026-08-02
+
+### Changed
+- `sideEffects: false` in package.json, so bundlers can tree-shake unused
+  exports. Every module here is pure; without the declaration a consumer
+  importing one helper had to ship the whole library.
+
 ## 0.5.1 — 2026-07-07
 
 ### Fixed
