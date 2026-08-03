@@ -1,5 +1,7 @@
 # @nomideusz/svelte-geometrize
 
+[![npm](https://badgen.net/npm/v/@nomideusz/svelte-geometrize)](https://www.npmjs.com/package/@nomideusz/svelte-geometrize) [![license](https://badgen.net/badge/license/MIT/blue)](./LICENSE)
+
 Geometric image placeholders for Svelte 5 — instead of a blur, triangles resolve into the photo while it loads, [geometrize.co.uk](https://www.geometrize.co.uk/)-style.
 
 **[Live demo → svelte-geometrize.vercel.app](https://svelte-geometrize.vercel.app/)** · In production on [szkolyjogi.pl](https://szkolyjogi.pl), where 700+ listing heroes paint an instant geometric preview of the photo while it loads (open any school page, e.g. [this one](https://szkolyjogi.pl/krakow/szkola-jogi-na-debnikach-w-krakowie) — hard-refresh to replay), and on [kurcz.pl](https://kurcz.pl).
