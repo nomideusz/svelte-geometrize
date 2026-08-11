@@ -1,6 +1,6 @@
 # @nomideusz/svelte-geometrize
 
-[![npm](https://badgen.net/npm/v/@nomideusz/svelte-geometrize)](https://www.npmjs.com/package/@nomideusz/svelte-geometrize) [![license](https://badgen.net/badge/license/MIT/blue)](https://github.com/nomideusz/svelte-geometrize/blob/main/LICENSE)
+[![npm](https://img.shields.io/npm/v/@nomideusz/svelte-geometrize)](https://www.npmjs.com/package/@nomideusz/svelte-geometrize) [![license](https://img.shields.io/npm/l/@nomideusz/svelte-geometrize)](https://github.com/nomideusz/svelte-geometrize/blob/main/LICENSE)
 
 Geometric image placeholders for Svelte 5 — instead of a blur, triangles resolve into the photo while it loads, [geometrize.co.uk](https://www.geometrize.co.uk/)-style.
 
