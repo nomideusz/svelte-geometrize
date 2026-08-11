@@ -1,17 +1,24 @@
 {
   "name": "@nomideusz/svelte-geometrize",
-  "version": "0.5.2",
+  "version": "0.6.0",
   "description": "Geometric image placeholders for Svelte 5 — triangles resolve into the real photo as it loads. Build-time shape fitting, tiny runtime.",
   "type": "module",
   "sideEffects": false,
   "license": "MIT",
   "svelte": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "bin": {
+    "svelte-geometrize": "./dist/cli.js"
+  },
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
       "svelte": "./dist/index.js",
       "default": "./dist/index.js"
+    },
+    "./fit": {
+      "types": "./dist/fit/index.d.ts",
+      "default": "./dist/fit/index.js"
     },
     "./node": {
       "types": "./dist/node/index.d.ts",
@@ -20,6 +27,9 @@
     "./vite": {
       "types": "./dist/vite/index.d.ts",
       "default": "./dist/vite/index.js"
+    },
+    "./client": {
+      "types": "./dist/client.d.ts"
     }
   },
   "files": [
@@ -31,7 +41,7 @@
   "scripts": {
     "dev": "vite dev",
     "build": "vite build",
-    "package": "svelte-kit sync && svelte-package",
+    "package": "svelte-kit sync && svelte-package && node scripts/chmod-cli.js",
     "prepublishOnly": "npm run package",
     "preview": "vite preview",
     "prepare": "svelte-kit sync || echo ''",
@@ -41,11 +51,16 @@
     "test:watch": "vitest"
   },
   "peerDependencies": {
+    "sharp": ">=0.33.0",
     "svelte": "^5.0.0"
   },
+  "peerDependenciesMeta": {
+    "sharp": {
+      "optional": true
+    }
+  },
   "dependencies": {
-    "geometrizejs": "^0.0.19",
-    "sharp": "^0.34.5"
+    "geometrizejs": "^0.0.19"
   },
   "devDependencies": {
     "@sveltejs/adapter-auto": "^7.0.1",
@@ -54,6 +69,7 @@
     "@sveltejs/vite-plugin-svelte": "^6.2.4",
     "@types/node": "^25.9.4",
     "marked": "^17.0.6",
+    "sharp": "^0.34.5",
     "svelte": "^5.56.4",
     "svelte-check": "^4.7.1",
     "typescript": "^5.9.3",

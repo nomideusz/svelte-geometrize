@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.6.0 — 2026-08-11
+
+### Added
+- **`revealMs`** on `GeometrizedImage` — pace the whole shape reveal across a fixed time budget (derives stagger from shape count). Preferred over hand-tuning `stagger`.
+- **`objectFit` / `objectPosition`** — photo + SVG `preserveAspectRatio` stay in sync (`cover` default, `contain`, `fill`, …).
+- **`seed`** fit option (default `1`) for reproducible placeholders; pass `false` for non-deterministic fits.
+- **`targetScore`** — stop early once the approximation score is good enough.
+- **`@nomideusz/svelte-geometrize/fit`** — browser/worker-safe `fitShapes` export (no `sharp`).
+- **`generatePlaceholderFromUrl`** on the Node API.
+- **CLI** `svelte-geometrize` for batch ingest (`npx svelte-geometrize ./photos --out ./placeholders`).
+- **Persistent Vite disk cache** keyed by file content hash + resolved options (`cacheDir`, default `node_modules/.cache/svelte-geometrize`). Concurrent identical loads coalesce.
+- Ambient types via `@nomideusz/svelte-geometrize/client`.
+
+### Changed
+- **`sharp` is an optional peer dependency** — runtime / DB-placeholder consumers no longer pull a native binary. Install `sharp` only for the Vite plugin, Node API, or CLI.
+- Tighter SVG payloads: `#rrggbb` fills, shorter opacity / float compaction.
+- `onload` / `onerror` are chained (no longer swallowed by the reveal handler).
+- `<img width/height>` default from `placeholder.w/h`; `aria-busy` while loading.
+- Removed always-on `will-change: opacity`.
+
+### Fixed
+- Plugin cache now invalidates when option defaults change (options are part of the key).
+
 ## 0.5.2 — 2026-08-02
 
 ### Changed

@@ -2,7 +2,7 @@ import sharp from 'sharp';
 import { fitShapes, DEFAULT_OPTIONS } from '../core/fit.js';
 import type { GeometrizeOptions, GeometrizePlaceholder } from '../core/types.js';
 
-export { fitShapes, DEFAULT_OPTIONS } from '../core/fit.js';
+export { fitShapes, DEFAULT_OPTIONS, optionsCacheKey } from '../core/fit.js';
 export { placeholderToSvg, placeholderToDataUri } from '../core/svg.js';
 export type { GeometrizeOptions, GeometrizePlaceholder, ShapeKind } from '../core/types.js';
 
@@ -10,6 +10,8 @@ export type { GeometrizeOptions, GeometrizePlaceholder, ShapeKind } from '../cor
  * Generates a placeholder from an image file or buffer. Decodes with sharp,
  * downscales to `maxSize` (fitting cost scales with pixel count; the SVG
  * scales back up losslessly), then fits shapes.
+ *
+ * Requires the optional peer dependency `sharp`.
  */
 export async function generatePlaceholder(
 	input: string | Buffer,
@@ -40,4 +42,20 @@ export async function generatePlaceholder(
 		sourceHeight,
 		options
 	);
+}
+
+/**
+ * Fetch a remote image and generate a placeholder. Convenience for CMS / ingest scripts.
+ */
+export async function generatePlaceholderFromUrl(
+	url: string,
+	options: GeometrizeOptions = {},
+	init?: RequestInit
+): Promise<GeometrizePlaceholder> {
+	const res = await fetch(url, init);
+	if (!res.ok) {
+		throw new Error(`svelte-geometrize: failed to fetch ${url} (${res.status})`);
+	}
+	const bytes = Buffer.from(await res.arrayBuffer());
+	return generatePlaceholder(bytes, options);
 }

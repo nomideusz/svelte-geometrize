@@ -27,6 +27,16 @@ export interface GeometrizeOptions {
 	 * Fitting works in this coordinate space; the SVG scales back up losslessly. Default 128.
 	 */
 	maxSize?: number;
+	/**
+	 * PRNG seed for reproducible fits. Default `1`.
+	 * Pass `false` for non-deterministic (Math.random) output.
+	 */
+	seed?: number | false;
+	/**
+	 * Stop early once the approximation score is at or below this value
+	 * (lower = closer to the source). Useful instead of (or with) a high `shapes` cap.
+	 */
+	targetScore?: number;
 }
 
 export interface GeometrizePlaceholder {
@@ -40,7 +50,7 @@ export interface GeometrizePlaceholder {
 	fw: number;
 	/** Height of the fitted canvas. */
 	fh: number;
-	/** Average image color, e.g. 'rgb(120,90,60)' — painted before any shape. */
+	/** Average image color, e.g. '#785a3c' — painted before any shape. */
 	bg: string;
 	/** SVG shape fragments in fit order: each one refines the approximation. */
 	s: string[];

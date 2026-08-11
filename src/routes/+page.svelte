@@ -5,7 +5,8 @@
 		ShapeKind,
 		GeometrizeOptions,
 		GeometrizePlaceholder,
-		GeometrizeReveal
+		GeometrizeReveal,
+		GeometrizeObjectFit
 	} from '$lib/index.js';
 	import FitWorker from './fit.worker.ts?worker';
 
@@ -19,7 +20,10 @@
 import placeholder from './photo.jpg?geometrize';
 import src from './photo.jpg';
 
-<GeometrizedImage {placeholder} {src} alt="Sunset over mountains" />`;
+<GeometrizedImage {placeholder} {src} alt="Sunset over mountains" revealMs={850} />
+
+// build / ingest also need: pnpm add -D sharp
+// npx svelte-geometrize ./photos --out ./placeholders`;
 
 	const SHAPE_KINDS: { key: ShapeKind; label: string }[] = [
 		{ key: 'triangle', label: 'Triangles' },
@@ -33,14 +37,11 @@ import src from './photo.jpg';
 	];
 
 	const MAX_SIZE = 128; // longest edge the fitter works in — keeps it fast at any upload size
-	// Reveal pacing: spread all the shapes across ~SHAPE_REVEAL_MS regardless of how many
-	// there are, then start the photo dissolve while fine detail is still trickling in.
-	// The reveal decelerates, so waiting for the true end (let alone adding a pause)
-	// leaves a beat of dead stillness before the fade — overlapping the tail keeps the
-	// motion continuous, exactly like a real photo arriving mid-reveal.
-	const SHAPE_REVEAL_MS = 850; // target time for the staggered shapes to finish appearing
-	const SHAPE_DURATION = 400; // per-shape fade (matches what we pass to the component)
-	const HANDOFF_AT = 0.65; // fraction of the reveal after which the photo starts dissolving
+	// Reveal pacing: revealMs spreads shapes across a fixed budget; handoff overlaps
+	// the decelerating tail so the photo arrives mid-reveal (no dead beat).
+	const SHAPE_REVEAL_MS = 850;
+	const SHAPE_DURATION = 400;
+	const HANDOFF_AT = 0.65;
 
 	// ── Image source ────────────────────────────────────
 	let mode = $state<'sample' | 'upload'>('sample');
@@ -57,6 +58,8 @@ import src from './photo.jpg';
 	let selectedTypes = $state<ShapeKind[]>(['triangle']);
 	let shapeCount = $state(100);
 	let alpha = $state(128);
+	let useTargetScore = $state(false);
+	let targetScore = $state(0.12);
 
 	// ── Reveal variant ──────────────────────────────────
 	const REVEALS: { key: GeometrizeReveal; label: string }[] = [
@@ -65,6 +68,12 @@ import src from './photo.jpg';
 		{ key: 'scatter', label: 'Scatter' }
 	];
 	let revealKind = $state<GeometrizeReveal>('fade');
+
+	const FITS: { key: GeometrizeObjectFit; label: string }[] = [
+		{ key: 'cover', label: 'Cover' },
+		{ key: 'contain', label: 'Contain' }
+	];
+	let objectFit = $state<GeometrizeObjectFit>('cover');
 
 	// ── Result + reveal state ───────────────────────────
 	let placeholder = $state<GeometrizePlaceholder>(initialPlaceholder);
@@ -80,14 +89,15 @@ import src from './photo.jpg';
 	const inlineBytes = $derived(gzipBytes || rawBytes);
 	const lighter = $derived(photoBytes && inlineBytes ? Math.round(photoBytes / inlineBytes) : 0);
 
-	// ── Reveal timing, scaled to the shape count ────────
-	// Per-shape gap so the whole reveal lasts ~SHAPE_REVEAL_MS no matter the count
-	// (clamped so few shapes aren't sluggish and many aren't a blur).
-	const revealStagger = $derived(
-		Math.min(40, Math.max(4, Math.round(SHAPE_REVEAL_MS / Math.max(placeholder.s.length - 1, 1))))
+	// Effective reveal budget passed to the component via revealMs
+	const revealBudget = $derived(
+		Math.min(
+			2000,
+			Math.max(200, Math.round(SHAPE_REVEAL_MS * Math.min(1.4, Math.max(0.6, placeholder.s.length / 100))))
+		)
 	);
 	// When the last shape has finished fading in — used to time the photo handoff.
-	const revealEndMs = $derived((placeholder.s.length - 1) * revealStagger + SHAPE_DURATION);
+	const revealEndMs = $derived(revealBudget + SHAPE_DURATION);
 
 	// Lean fit settings for the live demo — full quality runs at build time; here we
 	// trade a little fidelity for snappy, interactive re-fitting at 128px.
@@ -145,6 +155,8 @@ import src from './photo.jpg';
 		const n = shapeCount;
 		const a = alpha;
 		const url = imageSrc;
+		const scoreOn = useTargetScore;
+		const score = targetScore;
 		if (!primed) {
 			primed = true;
 			return;
@@ -153,7 +165,14 @@ import src from './photo.jpg';
 		const token = ++latestToken;
 		// `types` is a reactive $state proxy — spread to a plain array so the options
 		// object can be structured-cloned across to the worker (a Proxy cannot).
-		const options: GeometrizeOptions = { shapeTypes: [...types], shapes: n, alpha: a, ...LIVE_TUNING };
+		const options: GeometrizeOptions = {
+			shapeTypes: [...types],
+			shapes: n,
+			alpha: a,
+			seed: 1,
+			...(scoreOn ? { targetScore: score } : {}),
+			...LIVE_TUNING
+		};
 		const t = setTimeout(() => void runFit(token, url, options), 280);
 		return () => clearTimeout(t);
 	});
@@ -352,8 +371,9 @@ import src from './photo.jpg';
 							{placeholder}
 							src={revealSrc}
 							reveal={revealKind}
-							stagger={revealStagger}
+							revealMs={revealBudget}
 							shapeDuration={SHAPE_DURATION}
+							{objectFit}
 							alt="Geometrized preview"
 						/>
 					{/key}
@@ -456,6 +476,25 @@ import src from './photo.jpg';
 				</div>
 
 				<div class="control">
+					<span class="control-label">Object fit</span>
+					<div class="seg">
+						{#each FITS as f}
+							<button
+								class="seg-btn"
+								class:seg-btn--on={objectFit === f.key}
+								onclick={() => {
+									objectFit = f.key;
+									playReveal();
+								}}
+							>
+								{f.label}
+							</button>
+						{/each}
+					</div>
+					<span class="control-hint">cover crops; contain letterboxes — SVG matches the photo</span>
+				</div>
+
+				<div class="control">
 					<label class="control-label" for="c-shapes">Shapes <code>{shapeCount}</code></label>
 					<input id="c-shapes" type="range" min="20" max="200" step="5" bind:value={shapeCount} />
 					<span class="control-hint">more shapes = more detail, bigger payload</span>
@@ -465,6 +504,27 @@ import src from './photo.jpg';
 					<label class="control-label" for="c-alpha">Shape opacity <code>{alpha}</code></label>
 					<input id="c-alpha" type="range" min="32" max="255" step="1" bind:value={alpha} />
 					<span class="control-hint">lower = more layered, translucent shapes</span>
+				</div>
+
+				<div class="control">
+					<label class="control-label control-check" for="c-score">
+						<input id="c-score" type="checkbox" bind:checked={useTargetScore} />
+						Stop at score
+						{#if useTargetScore}<code>{targetScore.toFixed(2)}</code>{/if}
+					</label>
+					{#if useTargetScore}
+						<input
+							id="c-target"
+							type="range"
+							min="0.05"
+							max="0.35"
+							step="0.01"
+							bind:value={targetScore}
+						/>
+						<span class="control-hint">lower score = closer to the photo; stops before max shapes</span>
+					{:else}
+						<span class="control-hint">optional early-exit when the approximation is “good enough”</span>
+					{/if}
 				</div>
 			</div>
 		</div>
@@ -482,9 +542,9 @@ import src from './photo.jpg';
 				<span class="num">01</span>
 				<h3>Fit at build time</h3>
 				<p>
-					A Vite plugin fits geometric shapes to each <code>?geometrize</code> import. The
-					expensive part never ships — the browser just gets a few KB of ordered SVG shapes,
-					and the runtime stays tiny and dependency-free.
+					A Vite plugin fits geometric shapes to each <code>?geometrize</code> import — cached
+					on disk by content hash, so clean rebuilds skip work you've already done. Or batch
+					CMS photos with <code>npx svelte-geometrize</code>. The expensive part never ships.
 				</p>
 			</li>
 			<li>
@@ -500,9 +560,9 @@ import src from './photo.jpg';
 				<span class="num">03</span>
 				<h3>Reveal, then crossfade</h3>
 				<p>
-					Pure CSS sharpens the shapes in — before hydration, respecting reduced motion — then
-					the real photo resolves over the top. Content-aware, so it's the picture coming into
-					focus, not a blur.
+					<code>revealMs</code> paces the shapes across a fixed budget; pure CSS plays before
+					hydration and respects reduced motion. Then the photo dissolves over the same
+					structure — content-aware, not a blur.
 				</p>
 			</li>
 		</ol>
@@ -763,6 +823,22 @@ import src from './photo.jpg';
 		text-transform: uppercase;
 		letter-spacing: 0.07em;
 		color: var(--text-3);
+	}
+	.control-check {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		text-transform: none;
+		letter-spacing: 0;
+		font-size: 12px;
+		color: var(--text-2);
+		cursor: pointer;
+	}
+	.control-check input {
+		accent-color: var(--accent);
+		width: 14px;
+		height: 14px;
+		margin: 0;
 	}
 	.control-label code {
 		font: 500 11px/1 ui-monospace, 'Cascadia Code', monospace;

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { fitShapes } from './fit.js';
+import { fitShapes, optionsCacheKey } from './fit.js';
 import { placeholderToSvg, placeholderToDataUri } from './svg.js';
 
 function gradientRgba(w: number, h: number): Uint8Array {
@@ -27,7 +27,7 @@ describe('fitShapes', () => {
 		expect(placeholder.fh).toBe(32);
 		for (const frag of placeholder.s) {
 			expect(frag).toMatch(/^<polygon /);
-			expect(frag).toMatch(/fill="rgb\(\d+,\d+,\d+\)"/);
+			expect(frag).toMatch(/fill="#[0-9a-f]{6}"/);
 		}
 	});
 
@@ -40,12 +40,10 @@ describe('fitShapes', () => {
 			flat[i + 3] = 255;
 		}
 		const placeholder = fitShapes(flat, 16, 16, 16, 16, { shapes: 1 });
-		expect(placeholder.bg).toBe('rgb(200,100,50)');
+		expect(placeholder.bg).toBe('#c86432');
 	});
 
 	it('ignores transparent pixels when averaging the background', () => {
-		// Half opaque red-ish, half fully transparent (0,0,0,0). A naive mean would
-		// halve the channels toward black; alpha weighting must yield the opaque color.
 		const data = new Uint8Array(16 * 16 * 4);
 		for (let i = 0; i < data.length; i += 4) {
 			const opaque = i < data.length / 2;
@@ -55,7 +53,7 @@ describe('fitShapes', () => {
 			data[i + 3] = opaque ? 255 : 0;
 		}
 		const placeholder = fitShapes(data, 16, 16, 16, 16, { shapes: 1 });
-		expect(placeholder.bg).toBe('rgb(200,100,50)');
+		expect(placeholder.bg).toBe('#c86432');
 	});
 
 	it('supports other shape types', () => {
@@ -64,6 +62,29 @@ describe('fitShapes', () => {
 			shapeTypes: ['ellipse']
 		});
 		for (const frag of placeholder.s) expect(frag).toMatch(/^<ellipse /);
+	});
+
+	it('is deterministic with the default seed', () => {
+		const a = fitShapes(gradientRgba(24, 24), 24, 24, 24, 24, { shapes: 8, seed: 1 });
+		const b = fitShapes(gradientRgba(24, 24), 24, 24, 24, 24, { shapes: 8, seed: 1 });
+		expect(a.s).toEqual(b.s);
+		expect(a.bg).toBe(b.bg);
+	});
+
+	it('diverges with different seeds', () => {
+		const a = fitShapes(gradientRgba(24, 24), 24, 24, 24, 24, { shapes: 8, seed: 1 });
+		const b = fitShapes(gradientRgba(24, 24), 24, 24, 24, 24, { shapes: 8, seed: 99 });
+		expect(a.s).not.toEqual(b.s);
+	});
+
+	it('stops early when targetScore is reached', () => {
+		const capped = fitShapes(gradientRgba(24, 24), 24, 24, 24, 24, {
+			shapes: 50,
+			targetScore: 0.5,
+			seed: 1
+		});
+		expect(capped.s.length).toBeLessThan(50);
+		expect(capped.s.length).toBeGreaterThan(0);
 	});
 
 	it('rejects mismatched pixel data', () => {
@@ -77,6 +98,18 @@ describe('fitShapes', () => {
 				shapeTypes: ['hexagon' as never]
 			})
 		).toThrow(/Unknown shape type/);
+	});
+});
+
+describe('optionsCacheKey', () => {
+	it('is stable regardless of shapeTypes order', () => {
+		expect(
+			optionsCacheKey({ shapeTypes: ['triangle', 'ellipse'], shapes: 10 })
+		).toBe(optionsCacheKey({ shapeTypes: ['ellipse', 'triangle'], shapes: 10 }));
+	});
+
+	it('changes when options change', () => {
+		expect(optionsCacheKey({ shapes: 10 })).not.toBe(optionsCacheKey({ shapes: 20 }));
 	});
 });
 
