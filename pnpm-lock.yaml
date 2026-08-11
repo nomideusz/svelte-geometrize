@@ -11,9 +11,6 @@ importers:
       geometrizejs:
         specifier: ^0.0.19
         version: 0.0.19
-      sharp:
-        specifier: ^0.34.5
-        version: 0.34.5
     devDependencies:
       '@sveltejs/adapter-auto':
         specifier: ^7.0.1
@@ -33,6 +30,9 @@ importers:
       marked:
         specifier: ^17.0.6
         version: 17.0.6
+      sharp:
+        specifier: ^0.34.5
+        version: 0.34.5
       svelte:
         specifier: ^5.56.4
         version: 5.56.8
