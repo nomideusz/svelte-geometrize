@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onMount, untrack } from 'svelte';
-	import { GeometrizedImage } from '#lib/index.js';
+	import { GeometrizedImage, shapeCount as countShapes } from '#lib/index.js';
 	import type {
 		ShapeKind,
 		GeometrizeOptions,
@@ -93,7 +93,7 @@ import src from './photo.jpg';
 	const revealBudget = $derived(
 		Math.min(
 			2000,
-			Math.max(200, Math.round(SHAPE_REVEAL_MS * Math.min(1.4, Math.max(0.6, placeholder.s.length / 100))))
+			Math.max(200, Math.round(SHAPE_REVEAL_MS * Math.min(1.4, Math.max(0.6, countShapes(placeholder) / 100))))
 		)
 	);
 	// When the last shape has finished fading in — used to time the photo handoff.
@@ -400,7 +400,7 @@ import src from './photo.jpg';
 					</div>
 					<div class="stat">
 						<dt>Shapes</dt>
-						<dd>{placeholder.s.length}</dd>
+						<dd>{countShapes(placeholder)}</dd>
 						<span class="stat-sub">in fit order</span>
 					</div>
 					<div class="stat">
