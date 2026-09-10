@@ -1,13 +1,13 @@
 <script lang="ts">
 	import { onMount, untrack } from 'svelte';
-	import { GeometrizedImage } from '$lib/index.js';
+	import { GeometrizedImage } from '#lib/index.js';
 	import type {
 		ShapeKind,
 		GeometrizeOptions,
 		GeometrizePlaceholder,
 		GeometrizeReveal,
 		GeometrizeObjectFit
-	} from '$lib/index.js';
+	} from '#lib/index.js';
 	import FitWorker from './fit.worker.ts?worker';
 
 	// Build-time placeholder for the first paint — the real product. Matches the
@@ -219,7 +219,7 @@ import src from './photo.jpg';
 	// Fallback: the same fitter, on the main thread. ~0.5s of work, so it only runs
 	// when the worker is unavailable. Re-decodes because the worker took the pixels.
 	async function fitOnMainThread(token: number, url: string, options: GeometrizeOptions) {
-		const { fitShapes } = await import('$lib/core/fit.js');
+		const { fitShapes } = await import('#lib/core/fit.js');
 		const { rgba, w, h, sw, sh } = await rgbaFor(url);
 		if (token !== latestToken) return;
 		await new Promise((r) => requestAnimationFrame(r)); // let "Fitting…" paint first

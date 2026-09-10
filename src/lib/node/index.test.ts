@@ -1,6 +1,6 @@
 import sharp from 'sharp';
 import { describe, expect, it } from 'vitest';
-import { generatePlaceholder } from './index.js';
+import { generatePlaceholder, shapeCount } from './index.js';
 
 async function makeJpeg(width: number, height: number): Promise<Buffer> {
 	const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}">
@@ -18,7 +18,7 @@ describe('generatePlaceholder', () => {
 		expect(placeholder.h).toBe(600);
 		expect(placeholder.fw).toBe(64);
 		expect(placeholder.fh).toBe(48);
-		expect(placeholder.s).toHaveLength(20);
+		expect(shapeCount(placeholder)).toBe(20);
 	});
 
 	it('does not upscale images smaller than maxSize', async () => {
@@ -31,6 +31,6 @@ describe('generatePlaceholder', () => {
 	it('keeps the payload small', async () => {
 		const jpeg = await makeJpeg(1200, 800);
 		const placeholder = await generatePlaceholder(jpeg, { shapes: 100 });
-		expect(JSON.stringify(placeholder).length).toBeLessThan(12_000);
+		expect(JSON.stringify(placeholder).length).toBeLessThan(3_500);
 	});
 });

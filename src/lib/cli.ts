@@ -9,6 +9,8 @@
 import { mkdir, readdir, writeFile, stat } from 'node:fs/promises';
 import { basename, dirname, extname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { shapeCount } from './core/svg.js';
+import type { GeometrizePlaceholder } from './core/types.js';
 
 const IMAGE_EXT = new Set(['.jpg', '.jpeg', '.png', '.webp', '.gif', '.tif', '.tiff', '.avif']);
 
@@ -108,7 +110,7 @@ async function main(): Promise<void> {
 	let generatePlaceholder: (
 		input: string | Buffer,
 		options?: Record<string, unknown>
-	) => Promise<unknown>;
+	) => Promise<GeometrizePlaceholder>;
 	try {
 		const mod = await import('./node/index.js');
 		generatePlaceholder = mod.generatePlaceholder as typeof generatePlaceholder;
@@ -152,7 +154,7 @@ async function main(): Promise<void> {
 		await mkdir(dirname(dest), { recursive: true });
 		await writeFile(dest, json, 'utf8');
 		const ms = Math.round(performance.now() - started);
-		const shapes = (placeholder as { s: string[] }).s.length;
+		const shapes = shapeCount(placeholder);
 		console.log(`${basename(file)} → ${dest} (${shapes} shapes, ${json.length} B, ${ms} ms)`);
 	}
 }

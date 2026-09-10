@@ -92,6 +92,7 @@ async function contentKey(path: string, options: GeometrizeOptions): Promise<str
 		.update(buf)
 		.update('\0')
 		.update(optionsCacheKey(options))
+		.update('\0v2') // placeholder format — a cached v1 module must not survive the upgrade
 		.digest('hex')
 		.slice(0, 40);
 }

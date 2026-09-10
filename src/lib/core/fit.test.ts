@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { fitShapes, optionsCacheKey } from './fit.js';
-import { placeholderToSvg, placeholderToDataUri } from './svg.js';
+import {
+	placeholderToSvg,
+	placeholderToDataUri,
+	shapeFragments,
+	shapeCount,
+	takeShapes,
+	compactPlaceholder
+} from './svg.js';
+import type { GeometrizePlaceholderV1 } from './types.js';
 
 function gradientRgba(w: number, h: number): Uint8Array {
 	const data = new Uint8Array(w * h * 4);
@@ -17,17 +25,19 @@ function gradientRgba(w: number, h: number): Uint8Array {
 }
 
 describe('fitShapes', () => {
-	it('produces the requested number of ordered SVG fragments', () => {
+	it('produces the requested number of ordered v2 shape entries', () => {
 		const placeholder = fitShapes(gradientRgba(32, 32), 32, 32, 640, 640, { shapes: 12 });
-		expect(placeholder.v).toBe(1);
-		expect(placeholder.s).toHaveLength(12);
+		expect(placeholder.v).toBe(2);
+		expect(shapeCount(placeholder)).toBe(12);
 		expect(placeholder.w).toBe(640);
 		expect(placeholder.h).toBe(640);
 		expect(placeholder.fw).toBe(32);
 		expect(placeholder.fh).toBe(32);
-		for (const frag of placeholder.s) {
-			expect(frag).toMatch(/^<polygon /);
-			expect(frag).toMatch(/fill="#[0-9a-f]{6}"/);
+		if (placeholder.v !== 2) throw new Error('v2 expected');
+		expect(placeholder.a).toBe(0.502);
+		for (const entry of placeholder.s.split(';')) expect(entry).toMatch(/^p(-?\d+,){6}[0-9a-f]{6}$/);
+		for (const frag of shapeFragments(placeholder)) {
+			expect(frag).toMatch(/^<polygon points="-?\d+,-?\d+ -?\d+,-?\d+ -?\d+,-?\d+" fill="#[0-9a-f]{6}"\/>$/);
 		}
 	});
 
@@ -61,7 +71,7 @@ describe('fitShapes', () => {
 			shapes: 4,
 			shapeTypes: ['ellipse']
 		});
-		for (const frag of placeholder.s) expect(frag).toMatch(/^<ellipse /);
+		for (const frag of shapeFragments(placeholder)) expect(frag).toMatch(/^<ellipse /);
 	});
 
 	it('is deterministic with the default seed', () => {
@@ -83,8 +93,8 @@ describe('fitShapes', () => {
 			targetScore: 0.5,
 			seed: 1
 		});
-		expect(capped.s.length).toBeLessThan(50);
-		expect(capped.s.length).toBeGreaterThan(0);
+		expect(shapeCount(capped)).toBeLessThan(50);
+		expect(shapeCount(capped)).toBeGreaterThan(0);
 	});
 
 	it('rejects mismatched pixel data', () => {
@@ -119,7 +129,23 @@ describe('placeholderToSvg', () => {
 		const svg = placeholderToSvg(placeholder);
 		expect(svg).toContain('viewBox="0 0 16 16"');
 		expect(svg).toContain(`fill="${placeholder.bg}"`);
-		for (const frag of placeholder.s) expect(svg).toContain(frag);
+		expect(svg).toContain('<g fill-opacity="0.502" stroke-opacity="0.502">');
+		for (const frag of shapeFragments(placeholder)) expect(svg).toContain(frag);
+	});
+
+	it('renders every v2 shape kind', () => {
+		const svg = placeholderToSvg({
+			v: 2, w: 10, h: 10, fw: 10, fh: 10, bg: '#000000', a: 0.5,
+			s: 'p0,0,5,0,0,5,ff0000;r1,1,2,3,00ff00;R1,1,2,4,30,0000ff;e5,5,2,1,111111;E5,5,2,1,45,222222;c3,3,1,333333;l0,0,9,9,444444;q0,9,5,0,9,9,555555'
+		});
+		expect(svg).toContain('<polygon points="0,0 5,0 0,5" fill="#ff0000"/>');
+		expect(svg).toContain('<rect x="1" y="1" width="2" height="3" fill="#00ff00"/>');
+		expect(svg).toContain('<rect x="1" y="1" width="2" height="4" transform="rotate(30 2 3)" fill="#0000ff"/>');
+		expect(svg).toContain('<ellipse cx="5" cy="5" rx="2" ry="1" fill="#111111"/>');
+		expect(svg).toContain('<ellipse cx="5" cy="5" rx="2" ry="1" transform="rotate(45 5 5)" fill="#222222"/>');
+		expect(svg).toContain('<circle cx="3" cy="3" r="1" fill="#333333"/>');
+		expect(svg).toContain('<line x1="0" y1="0" x2="9" y2="9" stroke="#444444" stroke-width="1" fill="none"/>');
+		expect(svg).toContain('<path d="M0 9Q5 0 9 9" stroke="#555555" stroke-width="1" fill="none"/>');
 	});
 
 	it('encodes a usable data URI', () => {
@@ -128,5 +154,51 @@ describe('placeholderToSvg', () => {
 		expect(uri.startsWith('data:image/svg+xml,')).toBe(true);
 		expect(uri).not.toContain('<');
 		expect(uri).not.toContain('"');
+	});
+});
+
+describe('takeShapes', () => {
+	it('keeps the first n shapes of either format', () => {
+		const v2 = fitShapes(gradientRgba(16, 16), 16, 16, 16, 16, { shapes: 10 });
+		expect(shapeCount(takeShapes(v2, 4))).toBe(4);
+		expect(shapeCount(takeShapes(v2, 99))).toBe(10);
+		const v1: GeometrizePlaceholderV1 = { v: 1, w: 1, h: 1, fw: 1, fh: 1, bg: '#000', s: ['<a/>', '<b/>', '<c/>'] };
+		expect(takeShapes(v1, 2).s).toEqual(['<a/>', '<b/>']);
+	});
+});
+
+describe('compactPlaceholder', () => {
+	const v1: GeometrizePlaceholderV1 = {
+		v: 1, w: 800, h: 600, fw: 128, fh: 96, bg: '#695346',
+		s: [
+			'<polygon points="25,0 24,49 0,37" fill="#f29157" fill-opacity=".501"/>',
+			'<polygon points="3 4 5 6 7 8 9 10" fill="rgb(255,0,16)" fill-opacity=".501"/>',
+			'<rect x="1" y="2" width="3" height="4" fill="#00ff00" fill-opacity=".501"/>',
+			'<ellipse cx="5" cy="5" rx="2" ry="1" fill="#111111" fill-opacity=".501"/>',
+			'<circle cx="3" cy="3" r="1" fill="#333333" fill-opacity=".501"/>',
+			'<line x1="0" y1="0" x2="9" y2="9" stroke="#444444" stroke-width="1" fill="none" stroke-opacity=".501"/>',
+			'<path d="M0 9 Q 5 0 9 9" stroke="#555555" stroke-width="1" fill="none" stroke-opacity=".501"/>',
+			'<g transform="translate(5 6) rotate(45) scale(2 1)"><ellipse cx="0" cy="0" rx="1" ry="1" fill="#222222" fill-opacity=".501"/></g>'
+		]
+	};
+
+	it('re-encodes every v1 fragment the fitter produces, a third of the bytes', () => {
+		const v2 = compactPlaceholder(v1);
+		expect(v2.v).toBe(2);
+		if (v2.v !== 2) throw new Error('v2 expected');
+		expect(v2.a).toBe(0.501);
+		expect(v2.s).toBe(
+			'p25,0,24,49,0,37,f29157;p3,4,5,6,7,8,9,10,ff0010;r1,2,3,4,00ff00;e5,5,2,1,111111;c3,3,1,333333;l0,0,9,9,444444;q0,9,5,0,9,9,555555;E5,6,2,1,45,222222'
+		);
+		expect(JSON.stringify(v2).length * 2.5).toBeLessThan(JSON.stringify(v1).length);
+		// the shapes come back as the same markup, minus the per-shape opacity
+		expect(shapeFragments(v2)[0]).toBe('<polygon points="25,0 24,49 0,37" fill="#f29157"/>');
+	});
+
+	it('leaves a placeholder alone when a fragment is not one it knows', () => {
+		const odd: GeometrizePlaceholderV1 = { ...v1, s: [...v1.s, '<text>hi</text>'] };
+		expect(compactPlaceholder(odd)).toBe(odd);
+		const mixed: GeometrizePlaceholderV1 = { ...v1, s: [v1.s[0], v1.s[0].replace('.501', '.8')] };
+		expect(compactPlaceholder(mixed)).toBe(mixed);
 	});
 });

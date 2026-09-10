@@ -39,9 +39,7 @@ export interface GeometrizeOptions {
 	targetScore?: number;
 }
 
-export interface GeometrizePlaceholder {
-	/** Format version. */
-	v: 1;
+interface PlaceholderBase {
 	/** Intrinsic width of the source image (for aspect ratio / layout). */
 	w: number;
 	/** Intrinsic height of the source image. */
@@ -52,6 +50,34 @@ export interface GeometrizePlaceholder {
 	fh: number;
 	/** Average image color, e.g. '#785a3c' — painted before any shape. */
 	bg: string;
+}
+
+/** Format 1 (svelte-geometrize ≤ 0.6): one SVG fragment string per shape. */
+export interface GeometrizePlaceholderV1 extends PlaceholderBase {
+	v: 1;
 	/** SVG shape fragments in fit order: each one refines the approximation. */
 	s: string[];
 }
+
+/**
+ * Format 2 (svelte-geometrize ≥ 0.7): numbers, not markup — about a third
+ * of the bytes. `s` holds the shapes in fit order, `;`-separated; each is a
+ * kind letter, its integer parameters and a 6-hex colour, comma-joined:
+ *
+ *   p x1,y1,x2,y2,...   polygon (triangles, rotated rectangles)
+ *   r x,y,w,h           rectangle          R x,y,w,h,angle  rotated rectangle
+ *   e cx,cy,rx,ry       ellipse            E cx,cy,rx,ry,angle  rotated ellipse
+ *   c cx,cy,r           circle
+ *   l x1,y1,x2,y2       line (stroked)     q x1,y1,cx,cy,x2,y2  quadratic bézier (stroked)
+ *
+ * e.g. `p25,0,24,49,0,37,f29157;e12,30,5,8,aabbcc`. The alpha is shared.
+ */
+export interface GeometrizePlaceholderV2 extends PlaceholderBase {
+	v: 2;
+	/** Opacity of every shape, 0–1. */
+	a: number;
+	/** Encoded shapes in fit order, `;`-separated. */
+	s: string;
+}
+
+export type GeometrizePlaceholder = GeometrizePlaceholderV1 | GeometrizePlaceholderV2;

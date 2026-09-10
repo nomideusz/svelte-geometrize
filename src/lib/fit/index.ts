@@ -3,5 +3,5 @@
  * Pass pre-decoded RGBA (e.g. from canvas `getImageData` or a worker).
  */
 export { fitShapes, DEFAULT_OPTIONS, optionsCacheKey } from '../core/fit.js';
-export { placeholderToSvg, placeholderToDataUri } from '../core/svg.js';
-export type { GeometrizeOptions, GeometrizePlaceholder, ShapeKind } from '../core/types.js';
+export { placeholderToSvg, placeholderToDataUri, shapeCount, takeShapes, shapeFragments, shapeGroupOpen, compactPlaceholder } from '../core/svg.js';
+export type { GeometrizeOptions, GeometrizePlaceholder, GeometrizePlaceholderV1, GeometrizePlaceholderV2, ShapeKind } from '../core/types.js';

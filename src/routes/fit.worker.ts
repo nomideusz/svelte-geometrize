@@ -2,8 +2,8 @@
 // thread so dragging sliders / uploading photos never janks the UI. geometrizejs
 // is pure JS (no Node deps), so fitShapes runs unchanged in a worker — only the
 // RGBA decoding differs (canvas here vs. sharp at build time).
-import { fitShapes } from '$lib/core/fit.js';
-import type { GeometrizeOptions, GeometrizePlaceholder } from '$lib/core/types.js';
+import { fitShapes } from '#lib/core/fit.js';
+import type { GeometrizeOptions, GeometrizePlaceholder } from '#lib/core/types.js';
 
 interface FitRequest {
 	token: number;

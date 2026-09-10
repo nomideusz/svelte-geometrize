@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.7.0 — 2026-09-10
+
+### Changed
+- **Placeholder format v2 — numbers, not markup.** `fitShapes` / `generatePlaceholder` now emit `{ v: 2, a, s: "p25,0,24,49,0,37,f29157;…" }`: a kind letter, integer parameters and a colour per shape, one shared opacity. About a third of the bytes of 0.6's SVG-fragment list, and the rendered SVG drops the per-shape opacity too. Everything still reads v1 placeholders unchanged.
+- `GeometrizePlaceholder` is now the union `GeometrizePlaceholderV1 | GeometrizePlaceholderV2`; code that reached into `placeholder.s` as an array should use the helpers below.
+
+### Added
+- `shapeCount(p)`, `takeShapes(p, n)` — count and trim shapes of either format at render time (the fit is ordered, so a prefix is a coarser preview: store 100, send 30 on a list page).
+- `shapeFragments(p)` / `shapeGroupOpen(p)` — the SVG fragments and their opacity group, for custom renderers.
+- `compactPlaceholder(p)` — re-encode a stored v1 placeholder as v2 without re-fitting; returns the input untouched when a fragment is not one the fitter produces.
+
 ## 0.6.0 — 2026-08-11
 
 ### Added

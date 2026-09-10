@@ -6,15 +6,17 @@ Geometric image placeholders for Svelte 5 — instead of a blur, triangles resol
 
 **[Live demo → svelte-geometrize.vercel.app](https://svelte-geometrize.vercel.app/)** · In production on [szkolyjogi.pl](https://szkolyjogi.pl), where 700+ listing heroes paint an instant geometric preview of the photo while it loads (open any school page, e.g. [this one](https://szkolyjogi.pl/krakow/szkola-jogi-na-debnikach-w-krakowie) — hard-refresh to replay), and on [kurcz.pl](https://kurcz.pl).
 
-The expensive shape fitting (hill-climbing, via [geometrizejs](https://www.npmjs.com/package/geometrizejs)) runs **at build time** and emits a small ordered shape list (~1–10 KB raw, far less gzipped). Because geometrize is iterative — shape 1 is the dominant region, shape 100 is fine detail — replaying the shapes in fit order makes the placeholder visibly *sharpen* until the real image crossfades in. The runtime component is tiny and dependency-free (`sharp` is an optional peer for the Node / Vite / CLI half only).
+The expensive shape fitting (hill-climbing, via [geometrizejs](https://www.npmjs.com/package/geometrizejs)) runs **at build time** and emits a small ordered shape list (~1–3 KB raw, far less gzipped). Because geometrize is iterative — shape 1 is the dominant region, shape 100 is fine detail — replaying the shapes in fit order makes the placeholder visibly *sharpen* until the real image crossfades in. The runtime component is tiny and dependency-free (`sharp` is an optional peer for the Node / Vite / CLI half only).
 
-## Usage
+## Install
 
 ```bash
 pnpm add @nomideusz/svelte-geometrize
 # only needed for the Vite plugin, Node API, or CLI:
 pnpm add -D sharp
 ```
+
+## Usage
 
 Register the Vite plugin (build-time half):
 
@@ -129,7 +131,20 @@ await db.update(listings)
 />
 ```
 
-A placeholder is ~2–10 KB raw (a few KB gzipped), so inlining it in server-rendered HTML is cheap — the geometric preview paints before the photo's first byte arrives, no layout shift, and `sharp` stays a server-side ingest dependency, never shipped to the client.
+A placeholder is numbers, not markup: 30 shapes ≈ 800 B raw, 100 ≈ 2.5 KB (a fraction of that gzipped), so inlining it in server-rendered HTML is cheap even for a gallery — the geometric preview paints before the photo's first byte arrives, no layout shift, and `sharp` stays a server-side ingest dependency, never shipped to the client.
+
+### The placeholder format
+
+```json
+{ "v": 2, "w": 1600, "h": 1067, "fw": 128, "fh": 85, "bg": "#695346", "a": 0.502,
+  "s": "p25,0,24,49,0,37,f29157;p0,12,15,49,0,41,ff9402;…" }
+```
+
+`s` lists the shapes in fit order, `;`-separated: a kind letter, integer parameters in the `fw × fh` space, and a 6-hex colour (`p` polygon, `r`/`R` rectangle / rotated, `e`/`E` ellipse / rotated, `c` circle, `l` line, `q` quadratic bézier). `a` is the shared opacity. Helpers for stored placeholders, all browser-safe:
+
+- `shapeCount(p)` — how many shapes it holds.
+- `takeShapes(p, n)` — the first `n` shapes: a coarser preview for less bytes, no re-fit (the fit is ordered, so the big regions come first). Store 100, send 30 on a list page and 100 on the detail page.
+- `compactPlaceholder(p)` — re-encodes a pre-0.7 placeholder (one SVG string per shape, about 3× the bytes) in this format, for a one-off migration of what you already have stored. Everything still accepts the old format as-is.
 
 ## Demo
 

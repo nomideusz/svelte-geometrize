@@ -1,4 +1,4 @@
-import { ImageRunner, Bitmap, ShapeTypes, SvgExporter } from 'geometrizejs';
+import { ImageRunner, Bitmap, ShapeTypes } from 'geometrizejs';
 import type { GeometrizeOptions, GeometrizePlaceholder, ShapeKind } from './types.js';
 
 const SHAPE_TYPE_MAP: Record<ShapeKind, number> = {
@@ -102,19 +102,17 @@ export function fitShapes(
 			shapeMutationsPerStep: opts.shapeMutationsPerStep
 		};
 
-		const fragments: string[] = [];
-		while (fragments.length < opts.shapes) {
+		const entries: string[] = [];
+		const done = () => buildPlaceholder(rgba, width, height, sourceWidth, sourceHeight, entries, opts.alpha);
+		while (entries.length < opts.shapes) {
 			const results = runner.step(runnerOptions);
 			if (!results.length) break;
 			for (const result of results) {
-				fragments.push(compactFragment(SvgExporter.exportShape(result)));
-				if (opts.targetScore !== undefined && result.score <= opts.targetScore) {
-					return buildPlaceholder(rgba, width, height, sourceWidth, sourceHeight, fragments);
-				}
+				entries.push(encodeShape(result));
+				if (opts.targetScore !== undefined && result.score <= opts.targetScore) return done();
 			}
 		}
-
-		return buildPlaceholder(rgba, width, height, sourceWidth, sourceHeight, fragments);
+		return done();
 	});
 }
 
@@ -124,34 +122,76 @@ function buildPlaceholder(
 	height: number,
 	sourceWidth: number,
 	sourceHeight: number,
-	fragments: string[]
+	entries: string[],
+	alpha: number
 ): GeometrizePlaceholder {
 	return {
-		v: 1,
+		v: 2,
 		w: sourceWidth,
 		h: sourceHeight,
 		fw: width,
 		fh: height,
 		bg: averageColor(rgba),
-		s: fragments
+		a: Math.round((alpha / 255) * 1000) / 1000,
+		s: entries.join(';')
 	};
 }
 
-/** Shortens verbose SVG from the exporter for a smaller JSON payload. */
-function compactFragment(fragment: string): string {
-	return (
-		fragment
-			// long floats → 3 decimals, then strip trailing zeros
-			.replace(/(\d+\.\d{3})\d+/g, '$1')
-			.replace(/(\.\d*?)0+(?=")/g, '$1')
-			.replace(/\."/g, '"')
-			// rgb(r,g,b) → #rrggbb when channels are integers
-			.replace(/rgb\((\d+),(\d+),(\d+)\)/g, (_, r, g, b) => toHex(+r, +g, +b))
-			// fill-opacity="0.501" → fill-opacity=".5"
-			.replace(/fill-opacity="0\./g, 'fill-opacity=".')
-			// drop spaces after commas in points
-			.replace(/,\s+/g, ',')
-	);
+type StepResult = { color: number; shape: { getType(): number; getRawShapeData(): number[] } };
+
+/**
+ * One fitted shape → its v2 entry: kind letter, integer parameters, colour.
+ * Rectangles come from geometrize as two corners; stored as x,y,w,h so the
+ * decoder is a straight `<rect>`.
+ */
+function encodeShape(result: StepResult): string {
+	const type = result.shape.getType();
+	const d = result.shape.getRawShapeData().map(Math.round);
+	const c = result.color;
+	const hex = toHex((c >>> 24) & 255, (c >>> 16) & 255, (c >>> 8) & 255).slice(1);
+	const rect = () => {
+		const [x1, y1, x2, y2] = d;
+		return [Math.min(x1, x2), Math.min(y1, y2), Math.abs(x2 - x1), Math.abs(y2 - y1)];
+	};
+	let kind: string;
+	let values: number[];
+	switch (type) {
+		case ShapeTypes.RECTANGLE:
+			kind = 'r';
+			values = rect();
+			break;
+		case ShapeTypes.ROTATED_RECTANGLE:
+			kind = 'R';
+			values = [...rect(), d[4]];
+			break;
+		case ShapeTypes.TRIANGLE:
+			kind = 'p';
+			values = d;
+			break;
+		case ShapeTypes.ELLIPSE:
+			kind = 'e';
+			values = d;
+			break;
+		case ShapeTypes.ROTATED_ELLIPSE:
+			kind = 'E';
+			values = d;
+			break;
+		case ShapeTypes.CIRCLE:
+			kind = 'c';
+			values = d;
+			break;
+		case ShapeTypes.LINE:
+			kind = 'l';
+			values = d;
+			break;
+		case ShapeTypes.QUADRATIC_BEZIER:
+			kind = 'q';
+			values = d;
+			break;
+		default:
+			throw new Error(`svelte-geometrize: unexpected shape type ${type}`);
+	}
+	return `${kind}${values.join(',')},${hex}`;
 }
 
 function toHex(r: number, g: number, b: number): string {

@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { HTMLImgAttributes } from 'svelte/elements';
 	import type { GeometrizePlaceholder } from '../core/types.js';
+	import { shapeFragments, shapeGroupOpen } from '../core/svg.js';
 
 	export interface GeometrizeSource {
 		srcset: string;
@@ -66,9 +67,11 @@
 	let loaded = $state(false);
 	let revealToken = 0; // bumped on every src/sources change to cancel a stale pending reveal
 
+	const fragments = $derived(shapeFragments(placeholder));
+
 	const effectiveStagger = $derived(
 		revealMs !== undefined
-			? Math.max(0, Math.round(revealMs / Math.max(placeholder.s.length - 1, 1)))
+			? Math.max(0, Math.round(revealMs / Math.max(fragments.length - 1, 1)))
 			: stagger
 	);
 
@@ -117,13 +120,14 @@
 	});
 
 	const svgMarkup = $derived.by(() => {
-		const last = Math.max(placeholder.s.length - 1, 1);
+		const last = Math.max(fragments.length - 1, 1);
 		const dist = placeholder.fw * 0.1; // scatter fly-in distance, in viewBox units
 		const gap = effectiveStagger;
 		return (
 			`<svg viewBox="0 0 ${placeholder.fw} ${placeholder.fh}" preserveAspectRatio="${preserveAspectRatio}" aria-hidden="true">` +
 			`<rect width="${placeholder.fw}" height="${placeholder.fh}" fill="${placeholder.bg}"/>` +
-			placeholder.s
+			shapeGroupOpen(placeholder) +
+			fragments
 				.map((frag, i) => {
 					const delay = Math.round((i / last) ** 1.6 * last * gap);
 					let style = `animation-delay:${delay}ms`;
@@ -135,7 +139,7 @@
 					return `<g style="${style}">${frag}</g>`;
 				})
 				.join('') +
-			`</svg>`
+			`</g></svg>`
 		);
 	});
 
@@ -156,7 +160,7 @@
 	{#if src || srcset || sources.length > 0}
 		{#if sources.length > 0}
 			<picture>
-				{#each sources as source}
+				{#each sources as source (source.srcset)}
 					<source
 						srcset={source.srcset}
 						type={source.type}
@@ -212,15 +216,15 @@
 		display: block;
 	}
 
-	.geometrize :global(svg g) {
+	.geometrize :global(svg > g > g) {
 		transform-box: fill-box; /* scale/translate around each shape's own center, not the SVG origin */
 		transform-origin: center;
 		animation: geometrize-shape-in var(--geometrize-shape-ms, 400ms) ease-out both;
 	}
-	.reveal-pop :global(svg g) {
+	.reveal-pop :global(svg > g > g) {
 		animation-name: geometrize-shape-pop;
 	}
-	.reveal-scatter :global(svg g) {
+	.reveal-scatter :global(svg > g > g) {
 		animation-name: geometrize-shape-scatter;
 	}
 
@@ -279,7 +283,7 @@
 	}
 
 	@media (prefers-reduced-motion: reduce) {
-		.geometrize :global(svg g) {
+		.geometrize :global(svg > g > g) {
 			animation: none;
 		}
 		img {
