@@ -1,6 +1,6 @@
 // Renders media/reveal.webp — the README's animated clip — from a demo photo:
-// the shapes come in on the component's own stagger curve, then the photo
-// crossfades over them. Frame-by-frame with sharp, so it is reproducible
+// the shapes come in on the component's own stagger curve, then the photo comes
+// into focus over them the way the component does it. Frame-by-frame with sharp, so it is reproducible
 // (needs ffmpeg on PATH):
 //   pnpm package && node scripts/readme-clip.mjs
 import sharp from 'sharp';
@@ -18,8 +18,9 @@ const H = 427;
 const FRAME = 40; // ms — 25 fps
 const REVEAL = 1100; // until the last shape starts (the component's revealMs)
 const SHAPE = 400; // each shape's fade (shapeDuration)
-const PHOTO_AT = 1900; // photo crossfade start…
-const PHOTO_MS = 700; // …and length
+const PHOTO_AT = 1900; // the photo's focus pull starts…
+const PHOTO_MS = 800; // …and lasts (fadeDuration)
+const FOCUS = 0.02 * W; // its starting blur (--geometrize-focus: 2cqw)
 const HOLD = 1600; // the photo, still
 const OUT_MS = 400; // back to the bare background, where the loop starts
 
@@ -64,7 +65,13 @@ const push = async (raw, ms) => {
 await push(bare, 200);
 const full = await shapesAt(PHOTO_AT);
 for (let ms = 0; ms < PHOTO_AT; ms += FRAME) await push(await shapesAt(ms), FRAME);
-for (let ms = 0; ms < PHOTO_MS; ms += FRAME) await push(mix(full, photo, smooth(ms / PHOTO_MS)), FRAME);
+const focus = async (sigma) =>
+	sigma < 0.3 ? photo : sharp(photo, { raw: { width: W, height: H, channels: 3 } }).blur(sigma).raw().toBuffer();
+// opaque by 45% of the run, sharp by the end — the component's two transitions
+for (let ms = 0; ms < PHOTO_MS; ms += FRAME) {
+	const t = ms / PHOTO_MS;
+	await push(mix(full, await focus(FOCUS * (1 - easeOut(t))), easeOut(clamp(t / 0.45))), FRAME);
+}
 await push(photo, HOLD);
 for (let ms = FRAME; ms < OUT_MS; ms += FRAME) await push(mix(photo, bare, smooth(ms / OUT_MS)), FRAME);
 

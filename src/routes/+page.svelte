@@ -408,7 +408,7 @@ import src from './photo.jpg';
 		<p class="lead">
 			No blur. The placeholder <em>is</em> the image, approximated by geometric shapes fitted at
 			build time — and because they're stored in fit order, replaying them makes the picture
-			visibly sharpen until the real photo crossfades in.
+			visibly sharpen until the real photo comes into focus.
 		</p>
 		<button class="install" onclick={copyInstall}>
 			<span class="prompt" aria-hidden="true">$</span>
@@ -723,11 +723,11 @@ import src from './photo.jpg';
 			</li>
 			<li>
 				<span class="num">03</span>
-				<h3>Reveal, then crossfade</h3>
+				<h3>Reveal, then focus</h3>
 				<p>
 					<code>revealMs</code> paces the shapes across a fixed budget; pure CSS plays before
-					hydration and respects reduced motion. Then the photo dissolves over the same
-					structure — content-aware, not a blur.
+					hydration and respects reduced motion. Then the photo comes into focus over the
+					shapes — out of focus it is as coarse as they are, so they melt into it.
 				</p>
 			</li>
 		</ol>

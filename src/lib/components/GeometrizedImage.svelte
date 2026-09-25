@@ -34,7 +34,7 @@
 		stagger?: number;
 		/** Fade-in duration of each individual shape, in ms. Default 400. */
 		shapeDuration?: number;
-		/** Crossfade duration of the photo once loaded, in ms. Default 600. */
+		/** How long the photo takes to come into focus once loaded, in ms. Default 800. */
 		fadeDuration?: number;
 		/** object-fit for the photo (and matching SVG preserveAspectRatio). Default 'cover'. */
 		objectFit?: GeometrizeObjectFit;
@@ -56,7 +56,7 @@
 		revealMs,
 		stagger = 15,
 		shapeDuration = 400,
-		fadeDuration = 600,
+		fadeDuration = 800,
 		objectFit = 'cover',
 		objectPosition = 'center',
 		onload,
@@ -267,7 +267,7 @@
 	   transparent PNG would otherwise show the shapes through forever. */
 	.loaded :global(svg) {
 		visibility: hidden;
-		transition: visibility 0s var(--geometrize-fade-ms, 600ms);
+		transition: visibility 0s var(--geometrize-fade-ms, 800ms);
 	}
 
 	/* Shape i starts at (i/last)^1.6 · last · gap ms: quick through the big shapes,
@@ -330,6 +330,10 @@
 		display: block;
 	}
 
+	/* The handoff is a focus pull, not a crossfade: the photo comes in out of focus
+	   — about as coarse as the shapes, so they melt into it instead of ghosting
+	   through — is opaque by 45% of the fade, and sharpens for the rest, the way the
+	   shapes did. `--geometrize-focus: 0px` makes it a plain fade. */
 	img {
 		position: absolute;
 		inset: 0;
@@ -338,17 +342,22 @@
 		object-fit: var(--geometrize-object-fit, cover);
 		object-position: var(--geometrize-object-position, center);
 		opacity: 0;
-		transition: opacity var(--geometrize-fade-ms, 600ms) cubic-bezier(0.4, 0, 0.2, 1);
+		filter: blur(var(--geometrize-focus, 2cqw));
+		transition:
+			opacity calc(var(--geometrize-fade-ms, 800ms) * 0.45) ease-out,
+			filter var(--geometrize-fade-ms, 800ms) ease-out;
 	}
 
 	img.loaded {
 		opacity: 1;
+		filter: none;
 	}
 
 	/* nothing will ever add .loaded without JS — show the photo as it arrives */
 	@media (scripting: none) {
 		img {
 			opacity: 1;
+			filter: none;
 		}
 	}
 

@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.8.1 — 2026-09-25
+
+### Changed
+- **The photo comes into focus instead of crossfading.** The placeholder's hard edges ghosted through a half-faded sharp photo, and the photo landed in a quarter of a second after a reveal that built up over one — a swap, not an arrival. The photo now fades in out of focus (as coarse as the shapes, so they melt into it), is opaque by 45% of `fadeDuration`, and sharpens for the rest: coarse to fine, like the shapes. `fadeDuration` defaults to 800 (was 600). `--geometrize-focus` sets the starting blur (default `2cqw`); `0px` is the old plain fade.
+
 ## 0.8.0 — 2026-09-25
 
 ### Fixed
