@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.9.3 — 2026-09-25
+
+### Changed
+- **0.9.2 is undone: the handoff opens smallest first again, and it no longer rushes at the end.** Opening the biggest shapes first lost the effect: the photo arrived as one rectangle swelling out of the middle. `scatter` also flies every shape the full distance again. What 0.9.1 really needed was a slower ending. The big shapes carry most of the picture, and on an even pace they opened in a burst at the end: frame to frame, the image changed about five times faster than at the end of the reveal. Now the big shapes open further apart and grow for longer. The small ones still start at 0.9.1's pace, and the fastest moment of the handoff is about 25% calmer.
+- **`fadeDuration` now defaults to 1300 (was 800), and the extra time all goes to the ending.** At 1300 the first shapes open at 0.9.1's speed. A `fadeDuration` you set yourself now covers the slower ending too, so multiply it by about 1.6 to keep the start as fast as before.
+
 ## 0.9.2 — 2026-09-25
 
 ### Changed

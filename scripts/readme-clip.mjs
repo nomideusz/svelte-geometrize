@@ -19,7 +19,7 @@ const FRAME = 40; // ms — 25 fps
 const REVEAL = 1100; // until the last shape starts (the component's revealMs)
 const SHAPE = 400; // each shape's fade (shapeDuration)
 const PHOTO_AT = 1900; // the handoff starts…
-const PHOTO_MS = 800; // …and lasts (fadeDuration)
+const PHOTO_MS = 1300; // …and lasts (fadeDuration)
 const HOLD = 1600; // the photo, still
 const OUT_MS = 400; // back to the bare background, where the loop starts
 
@@ -56,8 +56,9 @@ const png = (raw) => sharp(raw, { raw: { width: W, height: H, channels: 3 } }).p
 
 const frames = [];
 const durations = [];
-// The handoff's mask: every shape white and opaque, grown from its centre in fit
-// order on the reveal's curve, each over half the run; then the gaps fill in.
+// The handoff's mask: every shape white and opaque, grown from its centre, the
+// last fitted first and the big ones further apart and slower; then the gaps fill
+// in — the component's timing.
 const white = (frag) => frag.replace(/(fill|stroke)="#[0-9a-f]+"/gi, '$1="#fff"');
 const group = shapeGroupOpen(placeholder).replace(/(fill|stroke)-opacity="[^"]*"/g, '$1-opacity="1"');
 const centre = (frag) => {
@@ -72,14 +73,18 @@ const centre = (frag) => {
 const centres = frags.map(centre);
 async function maskAt(ms) {
 	const windows = frags
-		.map((frag, i) => [frag, i, smooth(clamp((ms - (i / last) ** 1.6 * 0.5 * PHOTO_MS) / (0.5 * PHOTO_MS)))])
+		.map((frag, i) => {
+			const u = 1 - i / last;
+			const at = u * (1 + 0.7 * u) * 0.43 * PHOTO_MS;
+			return [frag, i, easeOut(clamp((ms - at) / ((0.17 + 0.1 * u) * PHOTO_MS)))];
+		})
 		.filter(([, , k]) => k > 0)
 		.map(([frag, i, k]) => {
 			const [x, y] = centres[i];
 			return `<g transform="translate(${x} ${y}) scale(${k.toFixed(4)}) translate(${-x} ${-y})">${white(frag)}</g>`;
 		})
 		.join('');
-	const gaps = easeOut(clamp((ms - 0.7 * PHOTO_MS) / (0.3 * PHOTO_MS)));
+	const gaps = easeOut(clamp((ms - 0.73 * PHOTO_MS) / (0.27 * PHOTO_MS)));
 	const svg =
 		`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${placeholder.fw} ${placeholder.fh}" width="${W}" height="${H}" preserveAspectRatio="xMidYMid slice">` +
 		`<rect width="${placeholder.fw}" height="${placeholder.fh}" fill="#000"/>` +
