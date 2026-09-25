@@ -339,6 +339,7 @@
 	   transparent PNG would otherwise show the shapes through forever. */
 	.loaded :global(svg) {
 		visibility: hidden;
+		transition: visibility 0s 150ms;
 	}
 
 	/* Shape i starts at (i/last)^1.6 · last · gap ms: quick through the big shapes,
@@ -450,8 +451,12 @@
 		opacity: 0;
 	}
 
+	/* The handoff's copy of the photo is resampled by the svg, a touch softer or
+	   sharper than the <img>'s: a short fade between the two same pictures hides
+	   the tick. */
 	img.loaded {
 		opacity: 1;
+		transition: opacity 150ms linear;
 	}
 
 	/* nothing will ever add .loaded without JS — show the photo as it arrives */
@@ -464,6 +469,9 @@
 	@media (prefers-reduced-motion: reduce) {
 		.geometrize :global(svg > g > *) {
 			animation: none;
+		}
+		img.loaded {
+			transition: none;
 		}
 	}
 </style>

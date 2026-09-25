@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.9.1 — 2026-09-25
+
+### Fixed
+- **No sharpness tick when the `<img>` takes over.** The svg resamples its copy of the photo a little differently from the `<img>`. On an 800 px photo shown at 832 px the two differed by a mean of 3/255, which showed as a faint sharpening at the swap. They now cross over in 150 ms. Both are the same picture, so nothing ghosts. Reduced motion still swaps at once.
+
 ## 0.9.0 — 2026-09-25
 
 ### Changed
