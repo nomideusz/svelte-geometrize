@@ -1,16 +1,18 @@
 /// <reference types="node" preserve="true" />
 import sharp from 'sharp';
-import { fitShapes, DEFAULT_OPTIONS } from '../core/fit.js';
+import { fitSteps, DEFAULT_OPTIONS } from '../core/fit.js';
 import type { GeometrizeOptions, GeometrizePlaceholder } from '../core/types.js';
 
 export { fitShapes, DEFAULT_OPTIONS, optionsCacheKey } from '../core/fit.js';
+export { PRESETS } from '../core/presets.js';
 export { placeholderToSvg, placeholderToDataUri, shapeCount, takeShapes, shapeFragments, shapeGroupOpen, compactPlaceholder } from '../core/svg.js';
-export type { GeometrizeOptions, GeometrizePlaceholder, GeometrizePlaceholderV1, GeometrizePlaceholderV2, ShapeKind } from '../core/types.js';
+export type { GeometrizeOptions, GeometrizePlaceholder, GeometrizePlaceholderV1, GeometrizePlaceholderV2, GeometrizePreset, ShapeKind } from '../core/types.js';
 
 /**
  * Generates a placeholder from an image file or buffer. Decodes with sharp,
  * downscales to `maxSize` (fitting cost scales with pixel count; the SVG
- * scales back up losslessly), then fits shapes.
+ * scales back up losslessly), then fits shapes — yielding to the event loop
+ * between steps, so a server fitting an upload keeps answering meanwhile.
  *
  * Requires the optional peer dependency `sharp`.
  */
@@ -35,7 +37,7 @@ export async function generatePlaceholder(
 		.raw()
 		.toBuffer({ resolveWithObject: true });
 
-	return fitShapes(
+	const steps = fitSteps(
 		new Uint8Array(data.buffer, data.byteOffset, data.byteLength),
 		info.width,
 		info.height,
@@ -43,6 +45,12 @@ export async function generatePlaceholder(
 		sourceHeight,
 		options
 	);
+	let step = steps.next();
+	while (!step.done) {
+		await new Promise((resolve) => setImmediate(resolve));
+		step = steps.next();
+	}
+	return step.value;
 }
 
 /**

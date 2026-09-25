@@ -2,6 +2,8 @@
 
 [![npm](https://img.shields.io/npm/v/@nomideusz/svelte-geometrize)](https://www.npmjs.com/package/@nomideusz/svelte-geometrize) [![license](https://img.shields.io/npm/l/@nomideusz/svelte-geometrize)](https://github.com/nomideusz/svelte-geometrize/blob/main/LICENSE)
 
+![A photo's shapes sharpening in fit order, then the photo crossfading in](https://raw.githubusercontent.com/nomideusz/svelte-geometrize/main/media/reveal.webp)
+
 Geometric image placeholders for Svelte 5 — instead of a blur, triangles resolve into the photo while it loads, [geometrize.co.uk](https://www.geometrize.co.uk/)-style.
 
 **[Live demo → svelte-geometrize.vercel.app](https://svelte-geometrize.vercel.app/)** · In production on [szkolyjogi.pl](https://szkolyjogi.pl), where 700+ listing heroes paint an instant geometric preview of the photo while it loads (open any school page, e.g. [this one](https://szkolyjogi.pl/krakow/szkola-jogi-na-debnikach-w-krakowie) — hard-refresh to replay), and on [kurcz.pl](https://kurcz.pl).
@@ -57,11 +59,28 @@ Plugin-wide defaults via `geometrize({ ... })`, per-image overrides via query pa
 
 Param order doesn't matter to the plugin, but keeping `geometrize` last lets the `*&geometrize` module declaration type these imports.
 
+A **preset** is a named look — its shape types and opacity — for when you'd rather pick one than tune two knobs:
+
+```
+./photo.jpg?preset=soft&geometrize
+```
+
+| Preset | Shapes | Alpha |
+| --- | --- | --- |
+| `triangles` | triangle | 128 — the default look |
+| `low-poly` | triangle | 255 |
+| `soft` | rotated-ellipse | 96 |
+| `mosaic` | rectangle | 255 |
+| `bubbles` | circle | 200 |
+
+A preset named on the import beats the plugin-wide `shapeTypes` / `alpha`; set either on the import itself and yours wins. `PRESETS` is exported from every entry.
+
 | Option | Default | Meaning |
 | --- | --- | --- |
 | `shapes` | `100` | Max shapes to fit — more detail, bigger payload |
 | `shapeTypes` | `['triangle']` | Any of `rectangle`, `rotated-rectangle`, `triangle`, `ellipse`, `rotated-ellipse`, `circle`, `line`, `quadratic-bezier` |
 | `alpha` | `128` | Shape opacity, 0–255 |
+| `preset` | — | A named look: `triangles`, `low-poly`, `soft`, `mosaic`, `bubbles` (see above) |
 | `maxSize` | `128` | Longest edge the image is downscaled to before fitting (the SVG scales back up losslessly) |
 | `candidateShapesPerStep` | `50` | Fit quality vs. build speed |
 | `shapeMutationsPerStep` | `100` | Fit quality vs. build speed |
@@ -71,7 +90,7 @@ Param order doesn't matter to the plugin, but keeping `geometrize` last lets the
 
 Fits are cached on disk by **file content hash + resolved options**, so clean rebuilds skip already-fitted images. Concurrent loads of the same key coalesce.
 
-Component props beyond `placeholder` / `src` / `alt`: `reveal` (`'fade' | 'pop' | 'scatter'`, default `'fade'`), `revealMs` (total ms until the last shape starts — preferred over raw `stagger`), `stagger` (ms between shapes, default 15), `shapeDuration` (per-shape fade, default 400), `fadeDuration` (crossfade to the real image, default 600), `objectFit` (`cover` \| `contain` \| `fill` \| …, default `cover`), `objectPosition` (default `center`). `onload` / `onerror` are forwarded (chained after the internal reveal). All other props go to the `<img>`. Width/height default from the placeholder. The reveal is pure CSS, plays with SSR before hydration, and respects `prefers-reduced-motion`.
+Component props beyond `placeholder` / `src` / `alt`: `reveal` (`'fade' | 'pop' | 'scatter'`, default `'fade'`), `revealMs` (total ms until the last shape starts — preferred over raw `stagger`), `stagger` (ms between shapes, default 15), `shapeDuration` (per-shape fade, default 400), `fadeDuration` (crossfade to the real image, default 600), `objectFit` (`cover` \| `contain` \| `fill` \| …, default `cover`), `objectPosition` (default `center`; keywords, percentages or lengths, not `var()`) — the placeholder crops exactly like the photo, so a box that isn't the photo's shape hands off without a jump. `onload` / `onerror` are forwarded (chained after the internal reveal). All other props go to the `<img>`. Width/height default from the placeholder. The reveal is pure CSS, plays with SSR before hydration, and respects `prefers-reduced-motion`.
 
 ## Node API
 
@@ -106,6 +125,7 @@ const placeholder = fitShapes(rgba, width, height, sourceW, sourceH, { shapes: 6
 ```bash
 npx svelte-geometrize photo.jpg -o photo.json
 npx svelte-geometrize ./photos --out ./placeholders --shapes 80 --target-score 0.12
+npx svelte-geometrize hero.jpg --preset soft
 ```
 
 ## Dynamic images (runtime srcs, DB-stored placeholders)

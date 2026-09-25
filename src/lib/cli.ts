@@ -8,7 +8,6 @@
  */
 import { mkdir, readdir, writeFile, stat } from 'node:fs/promises';
 import { basename, dirname, extname, join, resolve } from 'node:path';
-import { pathToFileURL } from 'node:url';
 import { shapeCount } from './core/svg.js';
 import type { GeometrizePlaceholder } from './core/types.js';
 
@@ -19,6 +18,7 @@ function printHelp(): void {
 
 Options:
   -o, --out <path>       Output JSON file (single input) or directory (batch)
+  --preset <name>        triangles, low-poly, soft, mosaic or bubbles
   --shapes <n>           Shape count (default 100)
   --max-size <n>         Longest edge before fitting (default 128)
   --alpha <n>            Shape opacity 0–255 (default 128)
@@ -41,6 +41,12 @@ function argValue(args: string[], i: number): string {
 	return v;
 }
 
+function numValue(args: string[], i: number): number {
+	const v = Number(argValue(args, i));
+	if (!Number.isFinite(v)) throw new Error(`${args[i]} expects a number, got "${args[i + 1]}"`);
+	return v;
+}
+
 async function main(): Promise<void> {
 	const args = process.argv.slice(2);
 	if (args.length === 0 || args.includes('-h') || args.includes('--help')) {
@@ -60,16 +66,20 @@ async function main(): Promise<void> {
 				out = argValue(args, i);
 				i++;
 				break;
+			case '--preset':
+				options.preset = argValue(args, i);
+				i++;
+				break;
 			case '--shapes':
-				options.shapes = Number.parseInt(argValue(args, i), 10);
+				options.shapes = numValue(args, i);
 				i++;
 				break;
 			case '--max-size':
-				options.maxSize = Number.parseInt(argValue(args, i), 10);
+				options.maxSize = numValue(args, i);
 				i++;
 				break;
 			case '--alpha':
-				options.alpha = Number.parseInt(argValue(args, i), 10);
+				options.alpha = numValue(args, i);
 				i++;
 				break;
 			case '--shape-types':
@@ -78,20 +88,20 @@ async function main(): Promise<void> {
 				break;
 			case '--seed': {
 				const raw = argValue(args, i);
-				options.seed = raw === 'false' ? false : Number.parseInt(raw, 10);
+				options.seed = raw === 'false' ? false : numValue(args, i);
 				i++;
 				break;
 			}
 			case '--target-score':
-				options.targetScore = Number.parseFloat(argValue(args, i));
+				options.targetScore = numValue(args, i);
 				i++;
 				break;
 			case '--candidates':
-				options.candidateShapesPerStep = Number.parseInt(argValue(args, i), 10);
+				options.candidateShapesPerStep = numValue(args, i);
 				i++;
 				break;
 			case '--mutations':
-				options.shapeMutationsPerStep = Number.parseInt(argValue(args, i), 10);
+				options.shapeMutationsPerStep = numValue(args, i);
 				i++;
 				break;
 			default:
@@ -159,16 +169,7 @@ async function main(): Promise<void> {
 	}
 }
 
-// Only run when executed directly (not when imported in tests)
-const isDirect =
-	process.argv[1] &&
-	import.meta.url === pathToFileURL(resolve(process.argv[1])).href;
-
-if (isDirect) {
-	main().catch((err) => {
-		console.error(err instanceof Error ? err.message : err);
-		process.exit(1);
-	});
-}
-
-export { main };
+main().catch((err) => {
+	console.error(err instanceof Error ? err.message : err);
+	process.exit(1);
+});

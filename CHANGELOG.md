@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.8.0 — 2026-09-25
+
+### Fixed
+- **Early shapes are fitted to the canvas the SVG actually paints.** geometrize started every fit from black while the SVG starts from the average colour, so the first shapes were tuned to brighten a canvas nobody sees. Seeding the fit with the average colour puts the first 5–20 shapes 15–30% closer to the photo (four test images) — the frames a reveal shows first and a `takeShapes` prefix keeps. New fits differ from 0.7's; stored placeholders keep rendering as before, and the Vite cache re-fits once.
+- **No more flat band along the right and bottom edges.** Shapes are fitted in pixel-centre space and never reach the last column and row, which stayed bare background — about 1/128 of the box, 9 px on a 1200 px hero. The shape group is now stretched to the full viewBox (every placeholder, old or new, v1 or v2).
+- **The placeholder crops like the photo.** It took the box's centre whatever the photo did; now it follows `objectPosition` (keywords, percentages, lengths) and `objectFit` — including `none` and `scale-down`, which rendered as `cover` — so there is no jump or double image at the handoff when the box isn't the photo's shape.
+- **Transparent images:** the placeholder is hidden once the photo has faded in, instead of showing through a transparent PNG forever, and a cutout's clear area is fitted as background rather than as black.
+- **The CLI did nothing when run as `npx svelte-geometrize`** (a symlinked bin failed its "run directly?" check and exited 0 silently). Numeric flags now reject non-numbers instead of fitting with `NaN`.
+- Without JavaScript the photo stayed at `opacity: 0`; `@media (scripting: none)` shows it.
+- A placeholder rendered without `src` is announced as an image with its `alt`.
+- Vite plugin: every importer of an image watches it for HMR, not just the first; `?seed=false` works.
+- An unknown shape kind is skipped instead of throwing during render; `sources` with the same `srcset` no longer crash the keyed `{#each}`.
+- **`generatePlaceholder` no longer holds the event loop for the whole fit.** It yields between geometrize steps, so a server fitting an upload keeps answering — the longest stall on a 60-shape fit drops from ~530 ms to one step. Output is identical to `fitShapes`, and fits running side by side (the Vite plugin's) stay reproducible.
+- `seed: 0` was the same fit as `seed: 1`; it is its own seed now.
+
+### Added
+- **Presets** — `preset: 'triangles' | 'low-poly' | 'soft' | 'mosaic' | 'bubbles'`, a named look (shape types + opacity) on every fitter, `?preset=soft&geometrize` on the Vite plugin, `--preset` on the CLI. Explicit `shapeTypes` / `alpha` still win. `PRESETS` and the `GeometrizePreset` type are exported.
+- The README opens with a clip of a reveal (`scripts/readme-clip.mjs` renders it); the demo shows real photos, a gallery that loads at its own pace, the presets side by side, and a slider that replays any prefix of the fit via `takeShapes`.
+
+### Changed
+- **Lighter inline SVG.** Each shape carries only its index (`style="--i:7"`); the stagger curve and the scatter direction are computed in CSS (`pow()`, `cos()`, `sin()`). The rendered SVG is ~24% smaller (100 shapes, fade), more with `scatter`. Custom CSS aimed at the old per-shape wrapper (`svg > g > g`) should target `svg > g > *`. A browser without CSS exponential/trig functions shows the shapes all at once instead of staggered.
+
 ## 0.7.0 — 2026-09-10
 
 ### Changed

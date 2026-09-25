@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { fitShapes, optionsCacheKey } from './fit.js';
+import { fitShapes, fitSteps, optionsCacheKey } from './fit.js';
 import {
 	placeholderToSvg,
 	placeholderToDataUri,
@@ -53,6 +53,25 @@ describe('fitShapes', () => {
 		expect(placeholder.bg).toBe('#c86432');
 	});
 
+	it('fits over the background it renders on, not black', () => {
+		// a flat image over its own average needs no correction: the shape colour
+		// is the image colour (from a black start it would come out doubled)
+		const flat = new Uint8Array(16 * 16 * 4).map((_, i) => [100, 50, 25, 255][i % 4]);
+		const placeholder = fitShapes(flat, 16, 16, 16, 16, { shapes: 1 });
+		if (placeholder.v !== 2) throw new Error('v2 expected');
+		expect(placeholder.s.endsWith(',643219')).toBe(true);
+	});
+
+	it('leaves the clear area of a cutout to the background', () => {
+		// transparent half is fitted as the bg, not as black: every shape lands on
+		// the opaque half (x < 16 in this 32×16 image)
+		const data = new Uint8Array(32 * 16 * 4).map((_, i) => (i % 128 < 64 ? [200, 100, 50, 255][i % 4] : 0));
+		const placeholder = fitShapes(data, 32, 16, 32, 16, { shapes: 5 });
+		if (placeholder.v !== 2) throw new Error('v2 expected');
+		expect(placeholder.bg).toBe('#c86432');
+		for (const entry of placeholder.s.split(';')) expect(entry.endsWith(',000000')).toBe(false);
+	});
+
 	it('ignores transparent pixels when averaging the background', () => {
 		const data = new Uint8Array(16 * 16 * 4);
 		for (let i = 0; i < data.length; i += 4) {
@@ -85,6 +104,31 @@ describe('fitShapes', () => {
 		const a = fitShapes(gradientRgba(24, 24), 24, 24, 24, 24, { shapes: 8, seed: 1 });
 		const b = fitShapes(gradientRgba(24, 24), 24, 24, 24, 24, { shapes: 8, seed: 99 });
 		expect(a.s).not.toEqual(b.s);
+		const zero = fitShapes(gradientRgba(24, 24), 24, 24, 24, 24, { shapes: 8, seed: 0 });
+		expect(zero.s).not.toEqual(a.s);
+	});
+
+	it('stays reproducible when fits interleave step by step', () => {
+		const alone = fitShapes(gradientRgba(24, 24), 24, 24, 24, 24, { shapes: 8, seed: 3 });
+		const a = fitSteps(gradientRgba(24, 24), 24, 24, 24, 24, { shapes: 8, seed: 3 });
+		const b = fitSteps(gradientRgba(24, 24), 24, 24, 24, 24, { shapes: 8, seed: 7 });
+		let stepA = a.next();
+		while (!stepA.done) {
+			b.next();
+			Math.random();
+			stepA = a.next();
+		}
+		expect(stepA.value).toEqual(alone);
+	});
+
+	it('takes its look from a preset, and explicit options over it', () => {
+		const soft = fitShapes(gradientRgba(16, 16), 16, 16, 16, 16, { shapes: 3, preset: 'soft' });
+		expect(soft.v === 2 && soft.a).toBe(0.376);
+		for (const frag of shapeFragments(soft)) expect(frag).toMatch(/^<ellipse .*rotate/);
+		const mine = fitShapes(gradientRgba(16, 16), 16, 16, 16, 16, { shapes: 3, preset: 'soft', alpha: 255 });
+		expect(mine.v === 2 && mine.a).toBe(1);
+		expect(() => fitShapes(gradientRgba(8, 8), 8, 8, 8, 8, { preset: 'nope' as never })).toThrow(/Unknown preset/);
+		expect(optionsCacheKey({ preset: 'mosaic' })).toBe(optionsCacheKey({ shapeTypes: ['rectangle'], alpha: 255 }));
 	});
 
 	it('stops early when targetScore is reached', () => {
@@ -129,7 +173,8 @@ describe('placeholderToSvg', () => {
 		const svg = placeholderToSvg(placeholder);
 		expect(svg).toContain('viewBox="0 0 16 16"');
 		expect(svg).toContain(`fill="${placeholder.bg}"`);
-		expect(svg).toContain('<g fill-opacity="0.502" stroke-opacity="0.502">');
+		// 16/15: the fit's last pixel centre (15) stretched to the viewBox edge (16)
+		expect(svg).toContain('<g transform="scale(1.0667 1.0667)" fill-opacity="0.502" stroke-opacity="0.502">');
 		for (const frag of shapeFragments(placeholder)) expect(svg).toContain(frag);
 	});
 

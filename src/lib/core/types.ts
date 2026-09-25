@@ -11,7 +11,15 @@ export type ShapeKind =
 	| 'line'
 	| 'quadratic-bezier';
 
+/** A named look — see `PRESETS`. */
+export type GeometrizePreset = 'triangles' | 'low-poly' | 'soft' | 'mosaic' | 'bubbles';
+
 export interface GeometrizeOptions {
+	/**
+	 * A named look: its `shapeTypes` and `alpha`. Set either yourself and yours
+	 * wins. Default: none (triangles at 128).
+	 */
+	preset?: GeometrizePreset;
 	/** Number of shapes to fit. More shapes = more detail, bigger payload. Default 100. */
 	shapes?: number;
 	/** Shape primitives to fit. Default ['triangle']. */

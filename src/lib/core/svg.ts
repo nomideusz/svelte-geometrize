@@ -18,7 +18,7 @@ export function takeShapes<P extends GeometrizePlaceholder>(placeholder: P, n: n
 
 const stroke = (hex: string) => `stroke="#${hex}" stroke-width="1" fill="none"`;
 
-/** One v2 shape entry → an SVG fragment (opacity comes from the enclosing group). */
+/** One v2 shape entry → an SVG fragment (opacity comes from the enclosing group), '' if unknown. */
 function decodeShape(entry: string): string {
 	const kind = entry[0];
 	const parts = entry.slice(1).split(',');
@@ -46,7 +46,7 @@ function decodeShape(entry: string): string {
 		case 'q':
 			return `<path d="M${n[0]} ${n[1]}Q${n[2]} ${n[3]} ${n[4]} ${n[5]}" ${stroke(hex)}/>`;
 		default:
-			throw new Error(`svelte-geometrize: unknown shape kind "${kind}"`);
+			return ''; // a kind this version can't draw — skip it, never break the page render
 	}
 }
 
@@ -59,10 +59,16 @@ export function shapeFragments(placeholder: GeometrizePlaceholder): string[] {
 	return placeholder.s ? placeholder.s.split(';').map(decodeShape) : [];
 }
 
-/** Opening `<g>` that gives v2 shapes their shared opacity (a bare `<g>` for v1). */
+/**
+ * Opening `<g>` for the shapes: their shared opacity (v2), and a stretch of the
+ * fit's pixel-centre space — shapes reach `fw - 1`, not `fw` — to the full
+ * viewBox, or the last column and row stay bare background.
+ */
 export function shapeGroupOpen(placeholder: GeometrizePlaceholder): string {
-	if (placeholder.v === 1) return '<g>';
-	return `<g fill-opacity="${placeholder.a}" stroke-opacity="${placeholder.a}">`;
+	const k = (n: number) => Math.round((n / Math.max(n - 1, 1)) * 1e4) / 1e4;
+	const scale = `transform="scale(${k(placeholder.fw)} ${k(placeholder.fh)})"`;
+	if (placeholder.v === 1) return `<g ${scale}>`;
+	return `<g ${scale} fill-opacity="${placeholder.a}" stroke-opacity="${placeholder.a}">`;
 }
 
 /**

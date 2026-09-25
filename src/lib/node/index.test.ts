@@ -28,6 +28,21 @@ describe('generatePlaceholder', () => {
 		expect(placeholder.fh).toBe(30);
 	});
 
+	it('lets the event loop run while it fits', async () => {
+		const jpeg = await makeJpeg(1200, 800);
+		let last = performance.now();
+		let longest = 0;
+		const probe = setInterval(() => {
+			const now = performance.now();
+			longest = Math.max(longest, now - last);
+			last = now;
+		}, 1);
+		await generatePlaceholder(jpeg, { shapes: 60 });
+		clearInterval(probe);
+		longest = Math.max(longest, performance.now() - last);
+		expect(longest).toBeLessThan(100);
+	});
+
 	it('keeps the payload small', async () => {
 		const jpeg = await makeJpeg(1200, 800);
 		const placeholder = await generatePlaceholder(jpeg, { shapes: 100 });

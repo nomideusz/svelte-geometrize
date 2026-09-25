@@ -4,7 +4,8 @@ import { join } from 'node:path';
 import type { Plugin } from 'vite';
 import { generatePlaceholder } from '../node/index.js';
 import { optionsCacheKey } from '../core/fit.js';
-import type { GeometrizeOptions, ShapeKind } from '../core/types.js';
+import { PRESETS } from '../core/presets.js';
+import type { GeometrizeOptions, GeometrizePreset, ShapeKind } from '../core/types.js';
 
 export interface GeometrizePluginOptions extends GeometrizeOptions {
 	/**
@@ -20,7 +21,8 @@ export interface GeometrizePluginOptions extends GeometrizeOptions {
  * a GeometrizePlaceholder object, fitted at build time.
  *
  * Per-import overrides via query params:
- * `./photo.jpg?geometrize&shapes=150&alpha=160&maxSize=160&shapeTypes=triangle,ellipse`
+ * `./photo.jpg?geometrize&shapes=150&alpha=160&maxSize=160&shapeTypes=triangle,ellipse`,
+ * or a named look: `./photo.jpg?geometrize&preset=soft`.
  *
  * Fits are cached on disk by file content hash + resolved options, so clean
  * rebuilds skip already-fitted images. Concurrent loads of the same key coalesce.
@@ -52,8 +54,13 @@ export function geometrize(defaults: GeometrizePluginOptions = {}): Plugin {
 			const query = new URLSearchParams(rawQuery);
 			if (!query.has('geometrize')) return null;
 
-			const options = { ...optionDefaults, ...parseQueryOptions(query) };
+			const asked = parseQueryOptions(query);
+			// a preset named on the import beats the plugin-wide shapeTypes / alpha
+			const preset = asked.preset && PRESETS[asked.preset];
+			const options = { ...optionDefaults, ...preset, ...asked };
 			const key = await contentKey(path, options);
+			// every importing module id must watch the image, cache hit or not, for HMR
+			this.addWatchFile(path);
 
 			const hit = memory.get(key);
 			if (hit) return hit.code;
@@ -62,9 +69,6 @@ export function geometrize(defaults: GeometrizePluginOptions = {}): Plugin {
 			if (pending) return pending;
 
 			const work = (async () => {
-				// Always watch so HMR re-runs when the source image changes
-				this.addWatchFile(path);
-
 				if (cacheDir) {
 					const disk = await readDiskCache(cacheDir, key);
 					if (disk) {
@@ -92,7 +96,7 @@ async function contentKey(path: string, options: GeometrizeOptions): Promise<str
 		.update(buf)
 		.update('\0')
 		.update(optionsCacheKey(options))
-		.update('\0v2') // placeholder format — a cached v1 module must not survive the upgrade
+		.update('\0v2.1') // placeholder format + fitter revision — a stale cached fit must not survive an upgrade
 		.digest('hex')
 		.slice(0, 40);
 }
@@ -140,10 +144,12 @@ function parseQueryOptions(query: URLSearchParams): GeometrizeOptions {
 	if (candidates !== undefined) options.candidateShapesPerStep = candidates;
 	const mutations = int('shapeMutationsPerStep');
 	if (mutations !== undefined) options.shapeMutationsPerStep = mutations;
-	const seed = int('seed');
+	const seed = query.get('seed') === 'false' ? false : int('seed');
 	if (seed !== undefined) options.seed = seed;
 	const targetScore = float('targetScore');
 	if (targetScore !== undefined) options.targetScore = targetScore;
+	const preset = query.get('preset');
+	if (preset) options.preset = preset as GeometrizePreset;
 	const shapeTypes = query.get('shapeTypes');
 	if (shapeTypes) options.shapeTypes = shapeTypes.split(',') as ShapeKind[];
 	return options;

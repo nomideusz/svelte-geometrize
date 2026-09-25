@@ -1,19 +1,19 @@
 <script lang="ts">
 	import { onMount, untrack } from 'svelte';
-	import { GeometrizedImage, shapeCount as countShapes } from '#lib/index.js';
+	import type { Attachment } from 'svelte/attachments';
+	import { GeometrizedImage, PRESETS, shapeCount as countShapes, takeShapes } from '#lib/index.js';
 	import type {
 		ShapeKind,
 		GeometrizeOptions,
 		GeometrizePlaceholder,
+		GeometrizePreset,
 		GeometrizeReveal,
 		GeometrizeObjectFit
 	} from '#lib/index.js';
 	import FitWorker from './fit.worker.ts?worker';
-
-	// Build-time placeholder for the first paint — the real product. Matches the
-	// default controls below (triangles, 100 shapes); changing anything re-fits live.
-	import initialPlaceholder from './demo-photo.jpg?geometrize';
-	import demoPhoto from './demo-photo.jpg';
+	// Build-time placeholders for the first paint — the real product. The playground's
+	// matches its default controls (triangles, 100 shapes); changing anything re-fits live.
+	import { PHOTOS, STYLES } from './photos/index.js';
 
 	const INSTALL = 'pnpm add @nomideusz/svelte-geometrize';
 	const USAGE = `import { GeometrizedImage } from '@nomideusz/svelte-geometrize';
@@ -21,6 +21,8 @@ import placeholder from './photo.jpg?geometrize';
 import src from './photo.jpg';
 
 <GeometrizedImage {placeholder} {src} alt="Sunset over mountains" revealMs={850} />
+
+// a named look: './photo.jpg?preset=soft&geometrize'
 
 // build / ingest also need: pnpm add -D sharp
 // npx svelte-geometrize ./photos --out ./placeholders`;
@@ -45,14 +47,13 @@ import src from './photo.jpg';
 
 	// ── Image source ────────────────────────────────────
 	let mode = $state<'sample' | 'upload'>('sample');
+	let sample = $state(0);
 	let uploadUrl = $state('');
 	let uploadName = $state('');
-	let uploadBytes = $state(0);
-	let sampleBytes = $state(0);
 	let fileInput = $state<HTMLInputElement>();
 
-	const imageSrc = $derived(mode === 'upload' && uploadUrl ? uploadUrl : demoPhoto);
-	const photoBytes = $derived(mode === 'upload' ? uploadBytes : sampleBytes);
+	const imageSrc = $derived(mode === 'upload' && uploadUrl ? uploadUrl : PHOTOS[sample].src);
+	let photoBytes = $state(0);
 
 	// ── Fit options ─────────────────────────────────────
 	let selectedTypes = $state<ShapeKind[]>(['triangle']);
@@ -60,6 +61,24 @@ import src from './photo.jpg';
 	let alpha = $state(128);
 	let useTargetScore = $state(false);
 	let targetScore = $state(0.12);
+
+	const PRESET_LABELS: { key: GeometrizePreset; label: string }[] = [
+		{ key: 'triangles', label: 'Triangles' },
+		{ key: 'low-poly', label: 'Low-poly' },
+		{ key: 'soft', label: 'Soft' },
+		{ key: 'mosaic', label: 'Mosaic' },
+		{ key: 'bubbles', label: 'Bubbles' }
+	];
+	const activePreset = $derived(
+		PRESET_LABELS.find(({ key }) => {
+			const p = PRESETS[key];
+			return p.alpha === alpha && p.shapeTypes.join() === [...selectedTypes].sort().join();
+		})?.key
+	);
+	function applyPreset(key: GeometrizePreset) {
+		selectedTypes = [...PRESETS[key].shapeTypes];
+		alpha = PRESETS[key].alpha;
+	}
 
 	// ── Reveal variant ──────────────────────────────────
 	const REVEALS: { key: GeometrizeReveal; label: string }[] = [
@@ -76,7 +95,10 @@ import src from './photo.jpg';
 	let objectFit = $state<GeometrizeObjectFit>('cover');
 
 	// ── Result + reveal state ───────────────────────────
-	let placeholder = $state<GeometrizePlaceholder>(initialPlaceholder);
+	let placeholder = $state<GeometrizePlaceholder>(PHOTOS[0].placeholder);
+	// Fit-order scrubber: null plays the reveal; a number shows that many shapes, still.
+	let scrub = $state<number | null>(null);
+	const shown = $derived(scrub === null ? placeholder : takeShapes(placeholder, scrub));
 	let fitting = $state(false);
 	let fitMs = $state(0);
 	let run = $state(0);
@@ -84,7 +106,7 @@ import src from './photo.jpg';
 	let copied = $state(false);
 
 	// ── Live byte numbers, measured not guessed ─────────
-	const rawBytes = $derived(new TextEncoder().encode(JSON.stringify(placeholder)).length);
+	const rawBytes = $derived(new TextEncoder().encode(JSON.stringify(shown)).length);
 	let gzipBytes = $state(0);
 	const inlineBytes = $derived(gzipBytes || rawBytes);
 	const lighter = $derived(photoBytes && inlineBytes ? Math.round(photoBytes / inlineBytes) : 0);
@@ -133,12 +155,6 @@ import src from './photo.jpg';
 		} catch {
 			workerOk = false;
 		}
-
-		// measure the sample photo's transfer size once
-		fetch(demoPhoto)
-			.then((r) => r.blob())
-			.then((b) => (sampleBytes = b.size))
-			.catch(() => {});
 
 		return () => {
 			clearTimeout(watchdog);
@@ -253,9 +269,23 @@ import src from './photo.jpg';
 	// what makes Replay match a fresh load: otherwise {#key} recreates the component
 	// while src is still the loaded photo, so it flashes the photo before resetting.
 	function playReveal() {
+		scrub = null;
 		revealSrc = '';
 		run += 1;
 	}
+
+	// the photo's own size, for the "lighter" stat (a bundled asset or an object URL)
+	$effect(() => {
+		const url = imageSrc;
+		let cancelled = false;
+		fetch(url)
+			.then((r) => r.blob())
+			.then((b) => !cancelled && (photoBytes = b.size))
+			.catch(() => {});
+		return () => {
+			cancelled = true;
+		};
+	});
 
 	$effect(() => {
 		void run;
@@ -270,7 +300,7 @@ import src from './photo.jpg';
 
 	// gzip the placeholder JSON — its real over-the-wire cost — whenever it changes
 	$effect(() => {
-		const json = JSON.stringify(placeholder);
+		const json = JSON.stringify(shown);
 		let cancelled = false;
 		gzipSize(json).then((b) => {
 			if (!cancelled) gzipBytes = b;
@@ -307,14 +337,50 @@ import src from './photo.jpg';
 		if (uploadUrl) URL.revokeObjectURL(uploadUrl);
 		uploadUrl = URL.createObjectURL(file);
 		uploadName = file.name;
-		uploadBytes = file.size;
 		mode = 'upload';
 		(e.currentTarget as HTMLInputElement).value = ''; // allow re-picking the same file
 	}
 
-	function useSample() {
+	function useSample(i: number) {
+		sample = i;
 		mode = 'sample';
 	}
+
+	// ── Gallery: a page of photos on a slow connection ──
+	// Each photo "arrives" at its own moment; the shapes hold its box until then.
+	const ARRIVALS = [1300, 2400, 1700, 3000, 2000, 2700];
+	let galleryRun = $state(0); // 0 until the gallery is first seen
+	let galleryKey = $state(0); // re-mounts the tiles, so their shapes replay too
+	let gallerySrc = $state<string[]>(PHOTOS.map(() => ''));
+	$effect(() => {
+		if (!galleryRun) return;
+		gallerySrc = PHOTOS.map(() => '');
+		const timers = PHOTOS.map((p, i) => setTimeout(() => (gallerySrc[i] = p.src), ARRIVALS[i]));
+		return () => timers.forEach(clearTimeout);
+	});
+	function replayGallery() {
+		galleryKey += 1;
+		galleryRun += 1;
+	}
+
+	// ── Presets: replayed side by side ──────────────────
+	let stylesRun = $state(0);
+
+	/** Calls `fn` once, when the element first scrolls into view. */
+	const onFirstView =
+		(fn: () => void): Attachment<HTMLElement> =>
+		(node) => {
+			const io = new IntersectionObserver(
+				([entry]) => {
+					if (!entry.isIntersecting) return;
+					io.disconnect();
+					fn();
+				},
+				{ threshold: 0.4 }
+			);
+			io.observe(node);
+			return () => io.disconnect();
+		};
 
 	function copyInstall() {
 		navigator.clipboard.writeText(INSTALL);
@@ -356,6 +422,26 @@ import src from './photo.jpg';
 		</p>
 	</section>
 
+	<!-- ═══ Gallery ════════════════════════════════════════ -->
+	<section class="card" {@attach onFirstView(() => (galleryRun ||= 1))}>
+		<header class="card-hd">
+			<h2>A page of photos</h2>
+			<span class="hd-meta">throttled on purpose — each photo lands in its own time, and its shapes hold the box until it does</span>
+			<button class="replay replay--sm" onclick={replayGallery}>↻ Replay</button>
+		</header>
+		<div class="gallery">
+			{#key galleryKey}
+				{#each PHOTOS as photo, i (photo.src)}
+					<GeometrizedImage placeholder={photo.placeholder} src={gallerySrc[i]} alt={photo.alt} revealMs={700} />
+				{/each}
+			{/key}
+		</div>
+		<p class="credits">
+			Photos on Unsplash by
+			{#each PHOTOS as photo, i (photo.src)}{i ? ', ' : ''}<a href={photo.href} target="_blank" rel="noopener">{photo.by}</a>{/each}.
+		</p>
+	</section>
+
 	<!-- ═══ Playground ═════════════════════════════════════ -->
 	<section class="card">
 		<header class="card-hd">
@@ -366,17 +452,27 @@ import src from './photo.jpg';
 		<div class="playground">
 			<div class="preview">
 				<div class="frame">
-					{#key run}
+					{#if scrub !== null}
 						<GeometrizedImage
-							{placeholder}
-							src={revealSrc}
-							reveal={revealKind}
-							revealMs={revealBudget}
-							shapeDuration={SHAPE_DURATION}
+							placeholder={shown}
+							revealMs={0}
+							shapeDuration={0}
 							{objectFit}
-							alt="Geometrized preview"
+							alt="Geometrized preview, first {scrub} shapes"
 						/>
-					{/key}
+					{:else}
+						{#key run}
+							<GeometrizedImage
+								{placeholder}
+								src={revealSrc}
+								reveal={revealKind}
+								revealMs={revealBudget}
+								shapeDuration={SHAPE_DURATION}
+								{objectFit}
+								alt="Geometrized preview"
+							/>
+						{/key}
+					{/if}
 					{#if fitting}
 						<div class="fitting" aria-live="polite">Fitting…</div>
 					{/if}
@@ -385,6 +481,23 @@ import src from './photo.jpg';
 				<div class="preview-actions">
 					<button class="replay" onclick={playReveal}>↻ Replay reveal</button>
 					<span class="dims">{placeholder.w}×{placeholder.h}</span>
+				</div>
+
+				<div class="scrub">
+					<label class="control-label" for="c-scrub">
+						Fit order <code>{countShapes(shown)} / {countShapes(placeholder)}</code>
+					</label>
+					<input
+						id="c-scrub"
+						type="range"
+						min="1"
+						max={countShapes(placeholder)}
+						value={scrub ?? countShapes(placeholder)}
+						oninput={(e) => (scrub = +e.currentTarget.value)}
+					/>
+					<span class="control-hint">
+						drag back to watch it sharpen — <code>takeShapes(placeholder, n)</code> sends only the first n
+					</span>
 				</div>
 
 				<dl class="stats">
@@ -400,7 +513,7 @@ import src from './photo.jpg';
 					</div>
 					<div class="stat">
 						<dt>Shapes</dt>
-						<dd>{countShapes(placeholder)}</dd>
+						<dd>{countShapes(shown)}</dd>
 						<span class="stat-sub">in fit order</span>
 					</div>
 					<div class="stat">
@@ -414,13 +527,22 @@ import src from './photo.jpg';
 			<div class="controls">
 				<div class="control">
 					<span class="control-label">Image</span>
-					<div class="seg">
-						<button class="seg-btn" class:seg-btn--on={mode === 'sample'} onclick={useSample}>
-							Sample
-						</button>
+					<div class="thumbs">
+						{#each PHOTOS as photo, i (photo.src)}
+							{@const on = mode === 'sample' && sample === i}
+							<button
+								class="thumb"
+								class:thumb--on={on}
+								aria-pressed={on}
+								aria-label={photo.alt}
+								onclick={() => useSample(i)}
+							>
+								<img src={photo.src} alt="" width="54" height="36" loading="lazy" />
+							</button>
+						{/each}
 						<button
-							class="seg-btn"
-							class:seg-btn--on={mode === 'upload'}
+							class="thumb thumb--upload"
+							class:thumb--on={mode === 'upload'}
 							onclick={() => fileInput?.click()}
 						>
 							Upload…
@@ -441,9 +563,26 @@ import src from './photo.jpg';
 				</div>
 
 				<div class="control">
+					<span class="control-label">Preset</span>
+					<div class="chips">
+						{#each PRESET_LABELS as p (p.key)}
+							<button
+								class="chip"
+								class:chip--on={activePreset === p.key}
+								aria-pressed={activePreset === p.key}
+								onclick={() => applyPreset(p.key)}
+							>
+								{p.label}
+							</button>
+						{/each}
+					</div>
+					<span class="control-hint">a named look — sets the shape types and opacity below</span>
+				</div>
+
+				<div class="control">
 					<span class="control-label">Shape types</span>
 					<div class="chips">
-						{#each SHAPE_KINDS as s}
+						{#each SHAPE_KINDS as s (s.key)}
 							<button
 								class="chip"
 								class:chip--on={selectedTypes.includes(s.key)}
@@ -459,7 +598,7 @@ import src from './photo.jpg';
 				<div class="control">
 					<span class="control-label">Reveal</span>
 					<div class="seg">
-						{#each REVEALS as r}
+						{#each REVEALS as r (r.key)}
 							<button
 								class="seg-btn"
 								class:seg-btn--on={revealKind === r.key}
@@ -478,7 +617,7 @@ import src from './photo.jpg';
 				<div class="control">
 					<span class="control-label">Object fit</span>
 					<div class="seg">
-						{#each FITS as f}
+						{#each FITS as f (f.key)}
 							<button
 								class="seg-btn"
 								class:seg-btn--on={objectFit === f.key}
@@ -527,6 +666,32 @@ import src from './photo.jpg';
 					{/if}
 				</div>
 			</div>
+		</div>
+	</section>
+
+	<!-- ═══ Presets ════════════════════════════════════════ -->
+	<section class="card" {@attach onFirstView(() => (stylesRun += 1))}>
+		<header class="card-hd">
+			<h2>Presets</h2>
+			<span class="hd-meta">one photo, five looks — <code>?preset=soft&amp;geometrize</code></span>
+			<button class="replay replay--sm" onclick={() => (stylesRun += 1)}>↻ Replay</button>
+		</header>
+		<div class="styles">
+			{#each STYLES as style (style.preset)}
+				<figure>
+					{#key stylesRun}
+						<GeometrizedImage
+							placeholder={style.placeholder}
+							alt="The jellyfish in the {style.preset} preset"
+							revealMs={900}
+						/>
+					{/key}
+					<figcaption>
+						<code>{style.preset}</code>
+						<span>{kb(JSON.stringify(style.placeholder).length)} KB</span>
+					</figcaption>
+				</figure>
+			{/each}
 		</div>
 	</section>
 
@@ -700,6 +865,7 @@ import src from './photo.jpg';
 		background: var(--surface-2);
 		padding: 1px 5px;
 		border-radius: 3px;
+		white-space: nowrap;
 	}
 
 	/* ─── Playground layout ────────────────────────────── */
@@ -764,6 +930,66 @@ import src from './photo.jpg';
 	}
 	.dims {
 		font: 500 12px/1 ui-monospace, 'Cascadia Code', monospace;
+		color: var(--text-3);
+	}
+
+	.replay--sm {
+		margin-left: auto;
+		padding: 7px 12px;
+		font-size: 10px;
+	}
+	.scrub {
+		display: flex;
+		flex-direction: column;
+		gap: 8px;
+	}
+	.scrub input[type='range'] {
+		width: 100%;
+		accent-color: var(--accent);
+	}
+
+	/* ─── Gallery + presets ────────────────────────────── */
+	.gallery {
+		display: grid;
+		grid-template-columns: repeat(3, 1fr);
+		gap: 10px;
+	}
+	@media (max-width: 600px) {
+		.gallery {
+			grid-template-columns: repeat(2, 1fr);
+		}
+	}
+	.gallery :global(.geometrize),
+	.styles :global(.geometrize) {
+		border-radius: 8px;
+	}
+	.credits {
+		margin: 12px 0 0;
+		font: 400 11px/1.5 'Outfit', system-ui, sans-serif;
+		color: var(--text-3);
+	}
+	.credits a {
+		color: var(--text-2);
+	}
+	.credits a:hover {
+		color: var(--accent);
+	}
+	.styles {
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+		gap: 10px;
+	}
+	.styles figure {
+		margin: 0;
+		display: flex;
+		flex-direction: column;
+		gap: 8px;
+	}
+	.styles figcaption {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		font: 400 11px/1.3 ui-monospace, 'Cascadia Code', monospace;
 		color: var(--text-3);
 	}
 
@@ -882,6 +1108,43 @@ import src from './photo.jpg';
 	.seg-btn--on {
 		background: var(--accent-dim);
 		color: var(--accent);
+	}
+	.thumbs {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 6px;
+	}
+	.thumb {
+		width: 54px;
+		height: 36px;
+		padding: 0;
+		border: 1px solid var(--border-strong);
+		border-radius: 6px;
+		overflow: hidden;
+		background: var(--surface-2);
+		cursor: pointer;
+		opacity: 0.75;
+		transition: opacity 120ms;
+	}
+	.thumb:hover {
+		opacity: 1;
+	}
+	.thumb img {
+		display: block;
+		width: 100%;
+		height: 100%;
+		object-fit: cover;
+	}
+	.thumb--on {
+		opacity: 1;
+		outline: 2px solid var(--accent);
+		outline-offset: 1px;
+	}
+	.thumb--upload {
+		width: auto;
+		padding: 0 10px;
+		font: 600 11px/1 'Outfit', system-ui, sans-serif;
+		color: var(--text-2);
 	}
 	.img-name {
 		font: 500 11.5px/1.3 ui-monospace, 'Cascadia Code', monospace;

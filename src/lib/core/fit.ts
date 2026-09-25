@@ -1,4 +1,5 @@
 import { ImageRunner, Bitmap, ShapeTypes } from 'geometrizejs';
+import { PRESETS } from './presets.js';
 import type { GeometrizeOptions, GeometrizePlaceholder, ShapeKind } from './types.js';
 
 const SHAPE_TYPE_MAP: Record<ShapeKind, number> = {
@@ -13,7 +14,7 @@ const SHAPE_TYPE_MAP: Record<ShapeKind, number> = {
 };
 
 export const DEFAULT_OPTIONS: Required<
-	Omit<GeometrizeOptions, 'maxSize' | 'seed' | 'targetScore'>
+	Omit<GeometrizeOptions, 'maxSize' | 'seed' | 'targetScore' | 'preset'>
 > & {
 	maxSize: number;
 	seed: number | false;
@@ -28,6 +29,15 @@ export const DEFAULT_OPTIONS: Required<
 	seed: 1,
 	targetScore: undefined
 };
+
+/** Defaults, then the preset's look, then what was asked for. */
+function resolveOptions(options: GeometrizeOptions) {
+	const { preset } = options;
+	if (preset !== undefined && !Object.hasOwn(PRESETS, preset)) {
+		throw new Error(`Unknown preset "${preset}". Valid: ${Object.keys(PRESETS).join(', ')}`);
+	}
+	return { ...DEFAULT_OPTIONS, ...(preset && PRESETS[preset]), ...options };
+}
 
 function resolveShapeTypes(kinds: ShapeKind[]): number[] {
 	return kinds.map((kind) => {
@@ -53,16 +63,23 @@ function mulberry32(seed: number): () => number {
 	};
 }
 
-function withSeededRandom<T>(seed: number | false, fn: () => T): T {
-	if (seed === false) return fn();
-	const next = mulberry32(seed === 0 ? 1 : seed);
-	const original = Math.random;
-	Math.random = next;
-	try {
-		return fn();
-	} finally {
-		Math.random = original;
-	}
+/**
+ * geometrizejs draws from Math.random. Swapping it only around each call into
+ * the library keeps a fit reproducible even when a driver yields between steps
+ * and other code — or another fit — runs in the gap.
+ */
+function seededCalls(seed: number | false): <T>(fn: () => T) => T {
+	if (seed === false) return (fn) => fn();
+	const next = mulberry32(seed);
+	return (fn) => {
+		const original = Math.random;
+		Math.random = next;
+		try {
+			return fn();
+		} finally {
+			Math.random = original;
+		}
+	};
 }
 
 /**
@@ -83,41 +100,76 @@ export function fitShapes(
 	sourceHeight = height,
 	options: GeometrizeOptions = {}
 ): GeometrizePlaceholder {
+	const steps = fitSteps(rgba, width, height, sourceWidth, sourceHeight, options);
+	let step = steps.next();
+	while (!step.done) step = steps.next();
+	return step.value;
+}
+
+/**
+ * `fitShapes`, one geometrize step per `next()` — for a driver that yields
+ * between steps instead of holding its thread for the whole fit.
+ */
+export function* fitSteps(
+	rgba: Uint8Array | Uint8ClampedArray,
+	width: number,
+	height: number,
+	sourceWidth = width,
+	sourceHeight = height,
+	options: GeometrizeOptions = {}
+): Generator<void, GeometrizePlaceholder> {
 	if (rgba.length !== width * height * 4) {
 		throw new Error(
 			`Pixel data length ${rgba.length} does not match ${width}x${height} RGBA (${width * height * 4})`
 		);
 	}
-	const opts = { ...DEFAULT_OPTIONS, ...options };
+	const opts = resolveOptions(options);
+	const seeded = seededCalls(opts.seed);
 
-	return withSeededRandom(opts.seed, () => {
-		// geometrizejs accepts number[] | Buffer; copy once into a plain array
-		const bytes = Array.from(rgba as ArrayLike<number>);
-		const bitmap = Bitmap.createFromByteArray(width, height, bytes);
-		const runner = new ImageRunner(bitmap);
-		const runnerOptions = {
-			shapeTypes: resolveShapeTypes(opts.shapeTypes),
-			alpha: opts.alpha,
-			candidateShapesPerStep: opts.candidateShapesPerStep,
-			shapeMutationsPerStep: opts.shapeMutationsPerStep
-		};
+	// Fit over the colour the SVG paints first. From geometrize's default black
+	// start, the early shapes are fitted to brighten a canvas nobody ever sees —
+	// measured 15–30% further from the photo at 5–20 shapes.
+	const bg = averageColor(rgba);
+	const [br, bgr, bb] = [1, 3, 5].map((i) => parseInt(bg.slice(i, i + 2), 16));
+	// geometrizejs accepts number[] | Buffer; copy once into a plain array, with
+	// transparent pixels flattened onto that colour — the placeholder is opaque,
+	// and a cutout's clear area would otherwise be fitted as black.
+	const bytes = Array.from(rgba as ArrayLike<number>);
+	for (let i = 0; i < bytes.length; i += 4) {
+		const a = bytes[i + 3] / 255;
+		if (a === 1) continue;
+		bytes[i] = Math.round(bytes[i] * a + br * (1 - a));
+		bytes[i + 1] = Math.round(bytes[i + 1] * a + bgr * (1 - a));
+		bytes[i + 2] = Math.round(bytes[i + 2] * a + bb * (1 - a));
+		bytes[i + 3] = 255;
+	}
+	const bitmap = Bitmap.createFromByteArray(width, height, bytes);
+	// (geometrizejs's typings omit the runtime's second, background, argument)
+	const Runner = ImageRunner as unknown as new (image: Bitmap, background: number) => ImageRunner;
+	const runner = seeded(() => new Runner(bitmap, ((br << 24) | (bgr << 16) | (bb << 8) | 255) >>> 0));
+	const runnerOptions = {
+		shapeTypes: resolveShapeTypes(opts.shapeTypes),
+		alpha: opts.alpha,
+		candidateShapesPerStep: opts.candidateShapesPerStep,
+		shapeMutationsPerStep: opts.shapeMutationsPerStep
+	};
 
-		const entries: string[] = [];
-		const done = () => buildPlaceholder(rgba, width, height, sourceWidth, sourceHeight, entries, opts.alpha);
-		while (entries.length < opts.shapes) {
-			const results = runner.step(runnerOptions);
-			if (!results.length) break;
-			for (const result of results) {
-				entries.push(encodeShape(result));
-				if (opts.targetScore !== undefined && result.score <= opts.targetScore) return done();
-			}
+	const entries: string[] = [];
+	const done = () => buildPlaceholder(bg, width, height, sourceWidth, sourceHeight, entries, opts.alpha);
+	while (entries.length < opts.shapes) {
+		const results = seeded(() => runner.step(runnerOptions));
+		if (!results.length) break;
+		for (const result of results) {
+			entries.push(encodeShape(result));
+			if (opts.targetScore !== undefined && result.score <= opts.targetScore) return done();
 		}
-		return done();
-	});
+		yield;
+	}
+	return done();
 }
 
 function buildPlaceholder(
-	rgba: Uint8Array | Uint8ClampedArray,
+	bg: string,
 	width: number,
 	height: number,
 	sourceWidth: number,
@@ -131,7 +183,7 @@ function buildPlaceholder(
 		h: sourceHeight,
 		fw: width,
 		fh: height,
-		bg: averageColor(rgba),
+		bg,
 		a: Math.round((alpha / 255) * 1000) / 1000,
 		s: entries.join(';')
 	};
@@ -203,7 +255,7 @@ function toHex(r: number, g: number, b: number): string {
 
 /** Stable serialization of options for cache keys (sorted keys, defaults applied). */
 export function optionsCacheKey(options: GeometrizeOptions = {}): string {
-	const opts = { ...DEFAULT_OPTIONS, ...options };
+	const opts = resolveOptions(options);
 	const normalized = {
 		shapes: opts.shapes,
 		shapeTypes: [...opts.shapeTypes].sort(),
