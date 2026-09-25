@@ -1,3 +1,7 @@
+<script lang="ts" module>
+	let handoffs = 0; // mask ids — the handoff only ever renders in the browser, so a counter is safe
+</script>
+
 <script lang="ts">
 	import type { HTMLImgAttributes } from 'svelte/elements';
 	import type { GeometrizePlaceholder } from '../core/types.js';
@@ -34,7 +38,10 @@
 		stagger?: number;
 		/** Fade-in duration of each individual shape, in ms. Default 400. */
 		shapeDuration?: number;
-		/** How long the photo takes to come into focus once loaded, in ms. Default 800. */
+		/**
+		 * How long the photo takes to replace the shapes once loaded, in ms: it shows
+		 * through them in the order they came in, then fills the gaps. Default 800.
+		 */
 		fadeDuration?: number;
 		/** object-fit for the photo (and matching SVG preserveAspectRatio). Default 'cover'. */
 		objectFit?: GeometrizeObjectFit;
@@ -68,6 +75,8 @@
 
 	let img: HTMLImageElement | undefined = $state();
 	let loaded = $state(false);
+	let handoff: { src: string; id: string } | undefined = $state();
+	let handoffRunning = $state(false);
 	let revealToken = 0; // bumped on every src/sources change to cancel a stale pending reveal
 
 	const fragments = $derived(shapeFragments(placeholder));
@@ -124,7 +133,9 @@
 				() =>
 					requestAnimationFrame(() =>
 						requestAnimationFrame(() => {
-							if (token === revealToken) loaded = true;
+							if (token !== revealToken) return;
+							if (matchMedia?.('(prefers-reduced-motion: reduce)').matches) loaded = true;
+							else handoff = { src: e2.currentSrc || e2.src, id: `geometrize-${++handoffs}` };
 						})
 					),
 				untilLastShape(e2)
@@ -141,6 +152,7 @@
 
 	function handleError(e: Event) {
 		loaded = false;
+		handoff = undefined;
 		onerror?.(e as unknown as Parameters<NonNullable<typeof onerror>>[0]);
 	}
 
@@ -150,15 +162,15 @@
 		void sources;
 		revealToken++;
 		loaded = false;
+		handoff = undefined;
+		handoffRunning = false;
 		if (src || srcset || (sources && sources.length > 0)) reveal();
 	});
 
 	// Each shape carries only its index; the stagger and the scatter direction are
 	// worked out in CSS from it, so the inline markup stays the shapes themselves.
-	const svgMarkup = $derived(
-		`<svg viewBox="0 0 ${placeholder.fw} ${placeholder.fh}" preserveAspectRatio="${preserveAspectRatio}" aria-hidden="true">` +
-			`<rect width="${placeholder.fw}" height="${placeholder.fh}" fill="${placeholder.bg}"/>` +
-			shapeGroupOpen(placeholder) +
+	const shapes = $derived(
+		shapeGroupOpen(placeholder) +
 			fragments
 				.map((frag, i) =>
 					// a rotated shape keeps a wrapper: the reveal's CSS transform would
@@ -168,8 +180,24 @@
 						: frag.replace(/^<\w+/, `$& style="--i:${i}"`)
 				)
 				.join('') +
-			`</g></svg>`
+			`</g>`
 	);
+	const svgMarkup = $derived(
+		`<svg viewBox="0 0 ${placeholder.fw} ${placeholder.fh}" preserveAspectRatio="${preserveAspectRatio}" aria-hidden="true">` +
+			`<rect width="${placeholder.fw}" height="${placeholder.fh}" fill="${placeholder.bg}"/>` +
+			shapes +
+			`</svg>`
+	);
+
+	// The photo in viewBox units: the box the svg (and the photo) takes, which is the
+	// viewBox give or take the fit's rounding — cropped or letterboxed like the svg.
+	const photoBox = $derived.by(() => {
+		const { fw, fh, w, h } = placeholder;
+		const pick = objectFit === 'contain' ? Math.max : Math.min;
+		const bw = objectFit === 'fill' ? fw : pick(fw, (fh * w) / h);
+		const bh = objectFit === 'fill' ? fh : pick(fh, (fw * h) / w);
+		return { x: (fw - bw) / 2, y: (fh - bh) / 2, width: bw, height: bh };
+	});
 
 	const intrinsic = $derived(objectFit === 'none' || objectFit === 'scale-down');
 	const hasSrc = $derived(!!(src || srcset || sources.length));
@@ -200,6 +228,33 @@
 	aria-busy={!loaded && hasSrc}
 >
 	{@html svgMarkup}
+	{#if handoff}
+		<!-- the photo, cut out by the same shapes in the same order, then the gaps
+		     between them; once it is whole the real <img> takes over -->
+		<svg
+			class="handoff"
+			class:running={handoffRunning}
+			viewBox="0 0 {placeholder.fw} {placeholder.fh}"
+			{preserveAspectRatio}
+			aria-hidden="true"
+			onanimationend={(e) => {
+				if ((e.target as Element).classList.contains('geometrize-gaps')) loaded = true;
+			}}
+		>
+			<mask id={handoff.id} maskUnits="userSpaceOnUse" {...photoBox}>
+				{@html shapes}
+				<rect class="geometrize-gaps" {...photoBox} />
+			</mask>
+			<image
+				href={handoff.src}
+				{...photoBox}
+				preserveAspectRatio={objectFit === 'fill' ? 'none' : 'xMidYMid slice'}
+				mask="url(#{handoff.id})"
+				onload={() => (handoffRunning = true)}
+				onerror={() => (loaded = true)}
+			/>
+		</svg>
+	{/if}
 	{#if hasSrc}
 		{#if sources.length > 0}
 			<picture>
@@ -280,11 +335,10 @@
 		width: min(100cqw, 100cqh * var(--geometrize-ratio), var(--geometrize-w));
 		height: min(100cqh, 100cqw / var(--geometrize-ratio), var(--geometrize-h));
 	}
-	/* Once the photo has faded in, stop painting the placeholder under it — a
+	/* Once the photo is whole, stop painting the placeholder under it — a
 	   transparent PNG would otherwise show the shapes through forever. */
 	.loaded :global(svg) {
 		visibility: hidden;
-		transition: visibility 0s var(--geometrize-fade-ms, 800ms);
 	}
 
 	/* Shape i starts at (i/last)^1.6 · last · gap ms: quick through the big shapes,
@@ -314,6 +368,15 @@
 		}
 		to {
 			opacity: 1;
+		}
+	}
+
+	@keyframes -global-geometrize-window {
+		from {
+			transform: scale(0);
+		}
+		to {
+			transform: none;
 		}
 	}
 
@@ -347,10 +410,36 @@
 		display: block;
 	}
 
-	/* The handoff is a focus pull, not a crossfade: the photo comes in out of focus
-	   — about as coarse as the shapes, so they melt into it instead of ghosting
-	   through — is opaque by 45% of the fade, and sharpens for the rest, the way the
-	   shapes did. `--geometrize-focus: 0px` makes it a plain fade. */
+	/* The handoff runs the reveal backwards with the photo inside the shapes: each one
+	   grows from its centre, the last fitted (small, on the detail) first and the big
+	   ones sweeping over the rest, across 70% of the fade; then the gaps between them
+	   fill in. An alpha mask with every shape at full opacity, so the shapes' colours
+	   don't matter and no window is half see-through — fading big windows open read
+	   as a crossfade. */
+	.handoff mask {
+		mask-type: alpha;
+	}
+	.handoff mask :global(*) {
+		fill-opacity: 1;
+		stroke-opacity: 1;
+	}
+	.handoff :global(mask > g > *) {
+		transform-box: fill-box;
+		transform-origin: center;
+		animation: geometrize-window calc(var(--geometrize-fade-ms, 800ms) * 0.3) ease-out both paused;
+		animation-delay: calc(
+			(1 - var(--i) / var(--geometrize-last)) * var(--geometrize-fade-ms, 800ms) * 0.7
+		);
+	}
+	.handoff :global(.geometrize-gaps) {
+		animation: geometrize-shape-in calc(var(--geometrize-fade-ms, 800ms) * 0.3) ease-out both paused;
+		animation-delay: calc(var(--geometrize-fade-ms, 800ms) * 0.7);
+	}
+	.handoff.running :global(mask > g > *),
+	.handoff.running :global(.geometrize-gaps) {
+		animation-play-state: running;
+	}
+
 	img {
 		position: absolute;
 		inset: 0;
@@ -359,31 +448,22 @@
 		object-fit: var(--geometrize-object-fit, cover);
 		object-position: var(--geometrize-object-position, center);
 		opacity: 0;
-		filter: blur(var(--geometrize-focus, 2cqw));
-		transition:
-			opacity calc(var(--geometrize-fade-ms, 800ms) * 0.45) ease-out,
-			filter var(--geometrize-fade-ms, 800ms) ease-out;
 	}
 
 	img.loaded {
 		opacity: 1;
-		filter: none;
 	}
 
 	/* nothing will ever add .loaded without JS — show the photo as it arrives */
 	@media (scripting: none) {
 		img {
 			opacity: 1;
-			filter: none;
 		}
 	}
 
 	@media (prefers-reduced-motion: reduce) {
 		.geometrize :global(svg > g > *) {
 			animation: none;
-		}
-		img {
-			transition-duration: 0ms !important;
 		}
 	}
 </style>

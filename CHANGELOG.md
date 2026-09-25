@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.9.0 — 2026-09-25
+
+### Changed
+- **The photo takes over through the shapes: no blur, no crossfade.** 0.8.1's focus pull still ended the reveal on a blur, and a plain fade shows the placeholder's edges through a half-see-through photo. Now the photo opens through the placeholder's own shapes. Each shape grows from its centre, fully opaque, starting with the last fitted (small, on the detail) and ending with the big ones, over 70% of `fadeDuration`. Then the gaps between the shapes fill in. When the photo is whole, the real `<img>` takes over; its pixels match the last frame of the handoff (checked in Chrome and Firefox). Reduced motion swaps straight to the photo, and without JavaScript the photo shows as it arrives, as before.
+
+### Removed
+- `--geometrize-focus` (added in 0.8.1). There is no blur to tune any more. `fadeDuration` still sets the handoff's length.
+
 ## 0.8.2 — 2026-09-25
 
 ### Changed

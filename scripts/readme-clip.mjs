@@ -1,7 +1,7 @@
 // Renders media/reveal.webp — the README's animated clip — from a demo photo:
-// the shapes come in on the component's own stagger curve, then the photo comes
-// into focus over them the way the component does it. Frame-by-frame with sharp, so it is reproducible
-// (needs ffmpeg on PATH):
+// the shapes come in on the component's own stagger curve, then the photo opens
+// through them the way the component hands off. Frame-by-frame with sharp, so it
+// is reproducible (needs ffmpeg on PATH):
 //   pnpm package && node scripts/readme-clip.mjs
 import sharp from 'sharp';
 import { execFileSync } from 'node:child_process';
@@ -18,9 +18,8 @@ const H = 427;
 const FRAME = 40; // ms — 25 fps
 const REVEAL = 1100; // until the last shape starts (the component's revealMs)
 const SHAPE = 400; // each shape's fade (shapeDuration)
-const PHOTO_AT = 1900; // the photo's focus pull starts…
+const PHOTO_AT = 1900; // the handoff starts…
 const PHOTO_MS = 800; // …and lasts (fadeDuration)
-const FOCUS = 0.02 * W; // its starting blur (--geometrize-focus: 2cqw)
 const HOLD = 1600; // the photo, still
 const OUT_MS = 400; // back to the bare background, where the loop starts
 
@@ -57,6 +56,45 @@ const png = (raw) => sharp(raw, { raw: { width: W, height: H, channels: 3 } }).p
 
 const frames = [];
 const durations = [];
+// The handoff's mask: every shape white and opaque, grown from its centre, the
+// last fitted first, across 70% of the run; then the gaps fill in.
+const white = (frag) => frag.replace(/(fill|stroke)="#[0-9a-f]+"/gi, '$1="#fff"');
+const group = shapeGroupOpen(placeholder).replace(/(fill|stroke)-opacity="[^"]*"/g, '$1-opacity="1"');
+const centre = (frag) => {
+	const num = (name) => Number(frag.match(new RegExp(` ${name}="([-\\d.]+)"`))?.[1] ?? 0);
+	if (frag.startsWith('<rect')) return [num('x') + num('width') / 2, num('y') + num('height') / 2];
+	if (frag.startsWith('<line')) return [(num('x1') + num('x2')) / 2, (num('y1') + num('y2')) / 2];
+	if (/^<(ellipse|circle)/.test(frag)) return [num('cx'), num('cy')];
+	const xy = (frag.match(/(?:points|d)="([^"]*)"/)?.[1] ?? '').match(/-?[\d.]+/g).map(Number);
+	const xs = xy.filter((_, i) => i % 2 === 0), ys = xy.filter((_, i) => i % 2 === 1);
+	return [(Math.min(...xs) + Math.max(...xs)) / 2, (Math.min(...ys) + Math.max(...ys)) / 2];
+};
+const centres = frags.map(centre);
+async function maskAt(ms) {
+	const windows = frags
+		.map((frag, i) => [frag, i, easeOut(clamp((ms - (1 - i / last) * 0.7 * PHOTO_MS) / (0.3 * PHOTO_MS)))])
+		.filter(([, , k]) => k > 0)
+		.map(([frag, i, k]) => {
+			const [x, y] = centres[i];
+			return `<g transform="translate(${x} ${y}) scale(${k.toFixed(4)}) translate(${-x} ${-y})">${white(frag)}</g>`;
+		})
+		.join('');
+	const gaps = easeOut(clamp((ms - 0.7 * PHOTO_MS) / (0.3 * PHOTO_MS)));
+	const svg =
+		`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${placeholder.fw} ${placeholder.fh}" width="${W}" height="${H}" preserveAspectRatio="xMidYMid slice">` +
+		`<rect width="${placeholder.fw}" height="${placeholder.fh}" fill="#000"/>` +
+		`${group}${windows}</g>` +
+		`<rect width="${placeholder.fw}" height="${placeholder.fh}" fill="#fff" opacity="${gaps.toFixed(4)}"/></svg>`;
+	return sharp(Buffer.from(svg)).greyscale().raw().toBuffer();
+}
+const through = (under, over, mask) => {
+	const out = Buffer.alloc(under.length);
+	for (let i = 0; i < under.length; i++) {
+		const m = mask[Math.floor(i / 3)] / 255;
+		out[i] = Math.round(under[i] + (over[i] - under[i]) * m);
+	}
+	return out;
+};
 const push = async (raw, ms) => {
 	frames.push(await png(raw));
 	durations.push(ms);
@@ -65,13 +103,7 @@ const push = async (raw, ms) => {
 await push(bare, 200);
 const full = await shapesAt(PHOTO_AT);
 for (let ms = 0; ms < PHOTO_AT; ms += FRAME) await push(await shapesAt(ms), FRAME);
-const focus = async (sigma) =>
-	sigma < 0.3 ? photo : sharp(photo, { raw: { width: W, height: H, channels: 3 } }).blur(sigma).raw().toBuffer();
-// opaque by 45% of the run, sharp by the end — the component's two transitions
-for (let ms = 0; ms < PHOTO_MS; ms += FRAME) {
-	const t = ms / PHOTO_MS;
-	await push(mix(full, await focus(FOCUS * (1 - easeOut(t))), easeOut(clamp(t / 0.45))), FRAME);
-}
+for (let ms = 0; ms < PHOTO_MS; ms += FRAME) await push(through(full, photo, await maskAt(ms)), FRAME);
 await push(photo, HOLD);
 for (let ms = FRAME; ms < OUT_MS; ms += FRAME) await push(mix(photo, bare, smooth(ms / OUT_MS)), FRAME);
 
