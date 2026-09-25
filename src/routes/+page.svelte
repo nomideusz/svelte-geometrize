@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onMount, untrack } from 'svelte';
+	import { onMount } from 'svelte';
 	import type { Attachment } from 'svelte/attachments';
 	import { GeometrizedImage, PRESETS, shapeCount as countShapes, takeShapes } from '#lib/index.js';
 	import type {
@@ -39,11 +39,10 @@ import src from './photo.jpg';
 	];
 
 	const MAX_SIZE = 128; // longest edge the fitter works in — keeps it fast at any upload size
-	// Reveal pacing: revealMs spreads shapes across a fixed budget; handoff overlaps
-	// the decelerating tail so the photo arrives mid-reveal (no dead beat).
+	// Reveal pacing: revealMs spreads shapes across a fixed budget; the component
+	// holds the (cached) photo until the last shape has started.
 	const SHAPE_REVEAL_MS = 850;
 	const SHAPE_DURATION = 400;
-	const HANDOFF_AT = 0.65;
 
 	// ── Image source ────────────────────────────────────
 	let mode = $state<'sample' | 'upload'>('sample');
@@ -102,7 +101,7 @@ import src from './photo.jpg';
 	let fitting = $state(false);
 	let fitMs = $state(0);
 	let run = $state(0);
-	let revealSrc = $state('');
+	let revealSrc = $state(PHOTOS[0].src);
 	let copied = $state(false);
 
 	// ── Live byte numbers, measured not guessed ─────────
@@ -118,8 +117,6 @@ import src from './photo.jpg';
 			Math.max(200, Math.round(SHAPE_REVEAL_MS * Math.min(1.4, Math.max(0.6, countShapes(placeholder) / 100))))
 		)
 	);
-	// When the last shape has finished fading in — used to time the photo handoff.
-	const revealEndMs = $derived(revealBudget + SHAPE_DURATION);
 
 	// Lean fit settings for the live demo — full quality runs at build time; here we
 	// trade a little fidelity for snappy, interactive re-fitting at 128px.
@@ -265,12 +262,11 @@ import src from './photo.jpg';
 		return { rgba: ctx.getImageData(0, 0, w, h).data, w, h, sw, sh };
 	}
 
-	// Replay the reveal. Resetting revealSrc *in the same update* as the key bump is
-	// what makes Replay match a fresh load: otherwise {#key} recreates the component
-	// while src is still the loaded photo, so it flashes the photo before resetting.
+	// Replay the reveal. The photo follows only here, with the placeholder fitted to
+	// it: a new pick keeps the old pair on screen until its own fit lands.
 	function playReveal() {
 		scrub = null;
-		revealSrc = '';
+		revealSrc = imageSrc;
 		run += 1;
 	}
 
@@ -285,17 +281,6 @@ import src from './photo.jpg';
 		return () => {
 			cancelled = true;
 		};
-	});
-
-	$effect(() => {
-		void run;
-		revealSrc = '';
-		// read untracked: this should re-fire only on replay/refit (run), not when the
-		// derived timing values change on their own
-		const url = untrack(() => imageSrc);
-		const delay = Math.round(untrack(() => revealEndMs) * HANDOFF_AT);
-		const t = setTimeout(() => (revealSrc = url), delay);
-		return () => clearTimeout(t);
 	});
 
 	// gzip the placeholder JSON — its real over-the-wire cost — whenever it changes

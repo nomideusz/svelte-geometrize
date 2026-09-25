@@ -100,6 +100,19 @@
 				: 'xMidYMid slice'
 	);
 
+	// A photo that is ready before the reveal has played waits until the last shape
+	// has started, so a fast load still shows the picture sharpening. Read off the
+	// shapes' own CSS animations: server-rendered, they started before hydration.
+	function untilLastShape(from: Element) {
+		const svg = from.closest('.geometrize')?.querySelector('svg');
+		let wait = 0;
+		for (const a of svg?.getAnimations?.({ subtree: true }) ?? []) {
+			const delay = a.effect?.getTiming().delay ?? 0;
+			if (typeof a.currentTime === 'number') wait = Math.max(wait, delay - a.currentTime);
+		}
+		return wait;
+	}
+
 	function reveal() {
 		const el = img;
 		if (!el || !el.complete || el.naturalWidth === 0) return; // not ready / broken → keep placeholder
@@ -107,10 +120,14 @@
 		const flip = () => {
 			const e2 = img;
 			if (token !== revealToken || !e2 || !e2.complete || e2.naturalWidth === 0) return;
-			requestAnimationFrame(() =>
-				requestAnimationFrame(() => {
-					if (token === revealToken) loaded = true;
-				})
+			setTimeout(
+				() =>
+					requestAnimationFrame(() =>
+						requestAnimationFrame(() => {
+							if (token === revealToken) loaded = true;
+						})
+					),
+				untilLastShape(e2)
 			);
 		};
 		if (el.decode) el.decode().then(flip, flip);

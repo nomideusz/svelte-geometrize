@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.8.2 — 2026-09-25
+
+### Changed
+- **A fast photo waits for the shapes.** A photo that was ready before the reveal had played took over at once — on a server-rendered page with a quick CDN, ~250 ms after first paint, when not one shape had finished fading in, so all that showed was the background colour and then the focus pull's blur. It now holds until the last shape has started (read off the shapes' own CSS animations, so it counts from first paint on SSR pages, not from hydration). A slow photo, a lazy one scrolled to later, or reduced motion don't wait. The photo lands up to one reveal later on fast loads — shorten `revealMs` / `stagger` to cap it.
+
 ## 0.8.1 — 2026-09-25
 
 ### Changed
