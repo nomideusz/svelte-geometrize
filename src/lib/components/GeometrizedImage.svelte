@@ -356,11 +356,14 @@
 	.reveal-pop :global(svg > g > *) {
 		animation-name: geometrize-shape-pop;
 	}
-	/* each shape flies in from its own direction, a golden angle past the last one's */
+	/* each shape flies in from its own direction, a golden angle past the last one's,
+	   and the later (smaller) it is the nearer it starts — a shard crossing the whole
+	   distance in the same time zips */
 	.reveal-scatter :global(svg > g > *) {
 		animation-name: geometrize-shape-scatter;
-		--gdx: calc(cos(var(--i) * 2.39996rad) * var(--geometrize-dist));
-		--gdy: calc(sin(var(--i) * 2.39996rad) * var(--geometrize-dist));
+		--gdd: calc(var(--geometrize-dist) * (1 - 0.75 * var(--i) / var(--geometrize-last)));
+		--gdx: calc(cos(var(--i) * 2.39996rad) * var(--gdd));
+		--gdy: calc(sin(var(--i) * 2.39996rad) * var(--gdd));
 	}
 
 	@keyframes -global-geometrize-shape-in {
@@ -411,12 +414,12 @@
 		display: block;
 	}
 
-	/* The handoff runs the reveal backwards with the photo inside the shapes: each one
-	   grows from its centre, the last fitted (small, on the detail) first and the big
-	   ones sweeping over the rest, across 70% of the fade; then the gaps between them
-	   fill in. An alpha mask with every shape at full opacity, so the shapes' colours
-	   don't matter and no window is half see-through — fading big windows open read
-	   as a crossfade. */
+	/* The handoff grows the photo out of the same shapes, on the reveal's own curve:
+	   the big ones first, each from its centre, so it opens as a few large windows
+	   swelling across the frame — the small ones first read as a spray of shards —
+	   over the fade's first stretch; then the gaps between them fill in. An alpha
+	   mask with every shape at full opacity, so the shapes' colours don't matter and
+	   no window is half see-through — fading big windows open read as a crossfade. */
 	.handoff mask {
 		mask-type: alpha;
 	}
@@ -427,9 +430,9 @@
 	.handoff :global(mask > g > *) {
 		transform-box: fill-box;
 		transform-origin: center;
-		animation: geometrize-window calc(var(--geometrize-fade-ms, 800ms) * 0.3) ease-out both paused;
+		animation: geometrize-window calc(var(--geometrize-fade-ms, 800ms) * 0.5) ease-in-out both paused;
 		animation-delay: calc(
-			(1 - var(--i) / var(--geometrize-last)) * var(--geometrize-fade-ms, 800ms) * 0.7
+			pow(var(--i) / var(--geometrize-last), 1.6) * var(--geometrize-fade-ms, 800ms) * 0.5
 		);
 	}
 	.handoff :global(.geometrize-gaps) {

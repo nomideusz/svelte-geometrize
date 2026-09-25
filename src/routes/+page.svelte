@@ -712,7 +712,7 @@ import src from './photo.jpg';
 				<p>
 					<code>revealMs</code> paces the shapes across a fixed budget; pure CSS plays before
 					hydration and respects reduced motion. Then the photo opens through the same shapes,
-					smallest first, and fills the gaps between them. Nothing is ever half see-through.
+					biggest first, and fills the gaps between them. Nothing is ever half see-through.
 				</p>
 			</li>
 		</ol>

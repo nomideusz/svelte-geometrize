@@ -56,8 +56,8 @@ const png = (raw) => sharp(raw, { raw: { width: W, height: H, channels: 3 } }).p
 
 const frames = [];
 const durations = [];
-// The handoff's mask: every shape white and opaque, grown from its centre, the
-// last fitted first, across 70% of the run; then the gaps fill in.
+// The handoff's mask: every shape white and opaque, grown from its centre in fit
+// order on the reveal's curve, each over half the run; then the gaps fill in.
 const white = (frag) => frag.replace(/(fill|stroke)="#[0-9a-f]+"/gi, '$1="#fff"');
 const group = shapeGroupOpen(placeholder).replace(/(fill|stroke)-opacity="[^"]*"/g, '$1-opacity="1"');
 const centre = (frag) => {
@@ -72,7 +72,7 @@ const centre = (frag) => {
 const centres = frags.map(centre);
 async function maskAt(ms) {
 	const windows = frags
-		.map((frag, i) => [frag, i, easeOut(clamp((ms - (1 - i / last) * 0.7 * PHOTO_MS) / (0.3 * PHOTO_MS)))])
+		.map((frag, i) => [frag, i, smooth(clamp((ms - (i / last) ** 1.6 * 0.5 * PHOTO_MS) / (0.5 * PHOTO_MS)))])
 		.filter(([, , k]) => k > 0)
 		.map(([frag, i, k]) => {
 			const [x, y] = centres[i];

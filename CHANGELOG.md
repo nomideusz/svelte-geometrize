@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.9.2 — 2026-09-25
+
+### Changed
+- **The handoff opens biggest shapes first.** 0.9.0 started with the small shapes, which sprayed dozens of small photo shards across the frame at the very end. The shapes now open in the order they were fitted, on the reveal's own curve. So the photo arrives as a few large windows growing from their centres, each over half of `fadeDuration` (ease-in-out). Then the gaps fill in, as before.
+- **`scatter`: later shapes fly in from nearer.** Every shape used to travel the same distance (10% of the width) in the same time, so the last, smallest shards zipped across. The distance now tapers with the shape's index, down to a quarter of it for the last shape.
+
 ## 0.9.1 — 2026-09-25
 
 ### Fixed
