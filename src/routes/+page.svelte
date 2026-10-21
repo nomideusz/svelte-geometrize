@@ -403,7 +403,9 @@ import src from './photo.jpg';
 		<p class="hero-prod">
 			In production on <a href="https://szkolyjogi.pl" target="_blank" rel="noopener">szkolyjogi.pl</a>
 			— 700+ listing photos resolve from their geometric preview — and
-			<a href="https://kurcz.pl" target="_blank" rel="noopener">kurcz.pl</a>.
+			<a href="https://kurcz.pl" target="_blank" rel="noopener">kurcz.pl</a>. On
+			<a href="https://zaur.app/#shapes" target="_blank" rel="noopener">zaur.app</a> every screenshot
+			does the same, and a switch holds the page at its triangles.
 		</p>
 	</section>
 
