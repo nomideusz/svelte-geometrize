@@ -11,7 +11,8 @@ import { join } from 'node:path';
 import { generatePlaceholder } from '../dist/node/index.js';
 import { shapeFragments, shapeGroupOpen } from '../dist/core/svg.js';
 
-const PHOTO = 'src/routes/photos/medusa.webp';
+// The demo photos live in the package hub now (asini monorepo).
+const PHOTO = '../demo/src/routes/geometrize/photos/medusa.webp';
 const OUT = 'media/reveal.webp';
 const W = 640;
 const H = 427;

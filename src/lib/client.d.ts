@@ -9,5 +9,3 @@ declare module '*&geometrize' {
 	const placeholder: import('@nomideusz/svelte-geometrize').GeometrizePlaceholder;
 	export default placeholder;
 }
-
-export {};

@@ -6,7 +6,7 @@
 
 Geometric image placeholders for Svelte 5 — instead of a blur, triangles resolve into the photo while it loads, [geometrize.co.uk](https://www.geometrize.co.uk/)-style.
 
-**[Live demo → svelte-geometrize.zaur.app](https://svelte-geometrize.zaur.app/)** · In production on [szkolyjogi.pl](https://szkolyjogi.pl), where 700+ listing heroes paint an instant geometric preview of the photo while it loads (open any school page, e.g. [this one](https://szkolyjogi.pl/krakow/szkola-jogi-na-debnikach-w-krakowie) — hard-refresh to replay), on [kurcz.pl](https://kurcz.pl), and on [zaur.app](https://zaur.app/?r=readme-svelte-geometrize#shapes), whose screenshots do the same (a switch there holds the whole page at its triangles).
+**[Live demo → svelte.zaur.app/geometrize](https://svelte.zaur.app/geometrize)** · In production on [szkolyjogi.pl](https://szkolyjogi.pl), where 700+ listing heroes paint an instant geometric preview of the photo while it loads (open any school page, e.g. [this one](https://szkolyjogi.pl/krakow/szkola-jogi-na-debnikach-w-krakowie) — hard-refresh to replay), on [kurcz.pl](https://kurcz.pl), and on [zaur.app](https://zaur.app/?r=readme-svelte-geometrize#shapes), whose screenshots do the same (a switch there holds the whole page at its triangles).
 
 The expensive shape fitting (hill-climbing, via [geometrizejs](https://www.npmjs.com/package/geometrizejs)) runs **at build time** and emits a small ordered shape list (~1–3 KB raw, far less gzipped). Because geometrize is iterative — shape 1 is the dominant region, shape 100 is fine detail — replaying the shapes in fit order makes the placeholder visibly *sharpen* until the real image takes over, cut into the same shapes. The runtime component is tiny and dependency-free (`sharp` is an optional peer for the Node / Vite / CLI half only).
 
@@ -168,7 +168,4 @@ A placeholder is numbers, not markup: 30 shapes ≈ 800 B raw, 100 ≈ 2.5 KB (a
 
 ## Demo
 
-```bash
-pnpm install
-pnpm dev
-```
+[svelte.zaur.app/geometrize](https://svelte.zaur.app/geometrize)

@@ -1,6 +1,6 @@
 {
   "name": "@nomideusz/svelte-geometrize",
-  "version": "0.9.3",
+  "version": "0.9.4",
   "description": "Geometric image placeholders for Svelte 5 — triangles resolve into the real photo as it loads. Build-time shape fitting, tiny runtime.",
   "type": "module",
   "sideEffects": false,
@@ -76,12 +76,10 @@
   },
   "devDependencies": {
     "@sveltejs/adapter-auto": "^8.0.0",
-    "@sveltejs/adapter-vercel": "^7.0.0",
     "@sveltejs/kit": "^3.0.0",
     "@sveltejs/package": "^3.0.0",
     "@sveltejs/vite-plugin-svelte": "^7.3.0",
     "@types/node": "^25.9.4",
-    "marked": "^17.0.6",
     "sharp": "^0.34.5",
     "svelte": "^5.57.1",
     "svelte-check": "^4.7.1",
@@ -103,5 +101,5 @@
     "type": "git",
     "url": "https://github.com/nomideusz/svelte-geometrize"
   },
-  "homepage": "https://svelte-geometrize.zaur.app/"
+  "homepage": "https://svelte.zaur.app/geometrize"
 }

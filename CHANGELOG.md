@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.9.4 — 2026-10-29
+
+### Fixed
+- **`/// <reference types="@nomideusz/svelte-geometrize/client" />` now types `?geometrize` imports.** `client.d.ts` ended in `export {}`, which made it a module, so its two `declare module` blocks were augmentations and never ambient: the README's reference line did nothing and the imports stayed "Cannot find module". Copying the blocks into `app.d.ts` still works too.
+
+### Changed
+- The demo moved to [svelte.zaur.app/geometrize](https://svelte.zaur.app/geometrize).
+
 ## 0.9.3 — 2026-09-25
 
 ### Changed
